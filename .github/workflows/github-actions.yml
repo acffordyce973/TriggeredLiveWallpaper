@@ -1,0 +1,73 @@
+name: GitHub Actions
+run-name: Build Release
+on:
+  - push
+jobs:
+  build_release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup JAVA 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: 21
+
+      - name: Cache Gradle and wrapper
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*') }}
+
+      - name: Decode Key
+        env:
+          ENCODED_STRING: ${{ secrets.KEYSTORE_KEY_BASE64 }}
+          SIGNING_KEY_STORE_PATH: ${{ secrets.KEYSTORE_KEY_PATH }}
+ 
+        run: |
+          echo $ENCODED_STRING > keystore-b64.txt
+          base64 -i -d keystore-b64.txt > $SIGNING_KEY_STORE_PATH
+
+      - name: Decode Properties
+        env:
+          ENCODED_STRING: ${{ secrets.KEYSTORE_PROPERTIES_BASE64 }}
+          SIGNING_PROPERTIES_STORE_PATH: ${{ secrets.KEYSTORE_PROPERTIES_PATH }}
+ 
+        run: |
+          echo $ENCODED_STRING > properties-b64.txt
+          base64 -i -d properties-b64.txt > $SIGNING_PROPERTIES_STORE_PATH
+
+      - name: Copy Keys
+        env:
+          SIGNING_KEY_STORE_PATH: ${{ secrets.KEYSTORE_KEY_PATH }}
+          SIGNING_PROPERTIES_STORE_PATH: ${{ secrets.KEYSTORE_PROPERTIES_PATH }}
+        run: |
+          cp $SIGNING_KEY_STORE_PATH app/$SIGNING_KEY_STORE_PATH
+          cp $SIGNING_PROPERTIES_STORE_PATH app/$SIGNING_PROPERTIES_STORE_PATH
+
+      - name: Build Release apk
+        run: ./gradlew assembleRelease
+
+      - name: List Outputs
+        run: ls app/build/outputs/apk/release/
+
+      - name: Upload Release Build to Artifacts
+        uses: actions/upload-artifact@v6
+        with:
+          name: release-artifacts
+          path: app/build/outputs/apk/release/
+          overwrite: true
+
+      - name: Create Github Release
+        uses: softprops/action-gh-release@v2
+        if: github.ref_type == 'tag'
+        with:
+          generate_release_notes: true
+          prerelease: false
+          files: |
+            app/build/outputs/apk/release/*.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.REPO_TOKEN }}

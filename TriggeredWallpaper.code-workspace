@@ -1,0 +1,61 @@
+{
+	"folders": [
+		{
+			"name": "Triggered Wallpaper (Android)",
+			"path": "."
+		}
+	],
+	"settings": {
+		"terminal.integrated.defaultProfile.windows": "PowerShell",
+		"files.exclude": {
+			"**/.git": true,
+			"**/.gradle": true
+		},
+		"java.configuration.updateBuildConfiguration": "interactive"
+	},
+	"launch": {
+		"version": "0.2.0",
+		"configurations": [
+			{
+				"name": "Run App on Tablet (Titan 1)",
+				"type": "PowerShell",
+				"request": "launch",
+				"script": "${workspaceFolder}/.vscode/RunOnTablet.ps1",
+				"args": [
+					"-stringDeviceId",
+					"DHF8256CS26070032"
+				]
+			},
+			{
+				"name": "Run App on Connected Device (Auto-detect)",
+				"type": "PowerShell",
+				"request": "launch",
+				"script": "${workspaceFolder}/.vscode/RunOnTablet.ps1",
+				"args": [
+					"-stringDeviceId",
+					"auto"
+				]
+			},
+			{
+				"name": "Run App on Emulator",
+				"type": "PowerShell",
+				"request": "launch",
+				"script": "${workspaceFolder}/.vscode/RunApp.ps1",
+				"args": [
+					"-stringAvdName",
+					"Medium_Phone_API_36.1"
+				]
+			},
+			{
+				"name": "Launch Android Emulator",
+				"type": "PowerShell",
+				"request": "launch",
+				"script": "${workspaceFolder}/.vscode/LaunchEmulator.ps1",
+				"args": [
+					"-stringAvdName",
+					"Medium_Phone_API_36.1"
+				]
+			}
+		]
+	}
+}

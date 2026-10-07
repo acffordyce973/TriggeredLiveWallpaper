@@ -1,0 +1,33 @@
+# Gradle files
+.gradle/
+build/
+app/build/
+
+# Local configuration file (sdk path, etc)
+local.properties
+
+# Local key signing
+keystore.properties
+*.jks
+*.keystore
+
+# Log/OS Files
+*.log
+.DS_Store
+
+# Android Studio generated files and folders
+captures/
+.externalNativeBuild/
+.cxx/
+*.aab
+*.apk
+output-metadata.json
+scratch/
+
+# IntelliJ and Kotlin
+*.iml
+.idea/
+.kotlin/
+
+# Android Profiling
+*.hprof

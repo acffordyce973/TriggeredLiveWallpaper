@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+	<link rel="stylesheet" href="leaflet/leaflet.css" />
+	<script src="leaflet/leaflet.js"></script>
+	<style>
+		* { box-sizing: border-box; }
+		html, body {
+			margin: 0;
+			padding: 0;
+			width: 100%;
+			height: 100%;
+			min-height: 100%;
+			background-color: #1e293b;
+			overflow: hidden;
+		}
+		#map {
+			position: absolute;
+			top: 0;
+			left: 0;
+			width: 100%;
+			height: 100%;
+			min-height: 100%;
+			background-color: #1e293b;
+			z-index: 1;
+		}
+		.custom-pin-marker {
+			background: transparent;
+			border: none;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+		}
+		.custom-pin-marker svg {
+			filter: drop-shadow(0px 3px 5px rgba(0, 0, 0, 0.5));
+		}
+		.leaflet-control-attribution {
+			font-size: 8px !important;
+			background: rgba(15, 23, 42, 0.75) !important;
+			color: #94a3b8 !important;
+			padding: 2px 4px !important;
+		}
+		.leaflet-control-attribution a {
+			color: #38bdf8 !important;
+		}
+		#loading {
+			position: absolute;
+			top: 50%;
+			left: 50%;
+			transform: translate(-50%, -50%);
+			color: #94a3b8;
+			font-family: sans-serif;
+			font-size: 13px;
+			pointer-events: none;
+			z-index: 2;
+		}
+	</style>
+</head>
+<body>
+	<div id="loading">Loading map...</div>
+	<div id="map"></div>
+	<script>
+		var map, marker, circle;
+		var currentLat = 37.4220;
+		var currentLng = -122.0841;
+		var currentRadius = 200;
+
+		var pinSvg = '<svg width="34" height="44" viewBox="0 0 34 44" fill="none" xmlns="http://www.w3.org/2000/svg">' +
+			'<path d="M17 0C7.61 0 0 7.61 0 17C0 27.6 17 44 17 44C17 44 34 27.6 34 17C34 7.61 26.39 0 17 0Z" fill="#3B82F6"/>' +
+			'<path d="M17 1C8.16 1 1 8.16 1 17C1 26.8 17 42.5 17 42.5C17 42.5 33 26.8 33 17C33 8.16 25.84 1 17 1Z" stroke="#FFFFFF" stroke-width="1.5"/>' +
+			'<circle cx="17" cy="17" r="5.5" fill="#FFFFFF"/>' +
+			'</svg>';
+
+		var customPin = L.divIcon({
+			className: 'custom-pin-marker',
+			html: pinSvg,
+			iconSize: [34, 44],
+			iconAnchor: [17, 44]
+		});
+
+		function resizeMap() {
+			var mapEl = document.getElementById('map');
+			if (mapEl) {
+				var h = window.innerHeight || document.documentElement.clientHeight || 260;
+				var w = window.innerWidth || document.documentElement.clientWidth || 300;
+				mapEl.style.height = h + 'px';
+				mapEl.style.width = w + 'px';
+				if (map) {
+					map.invalidateSize();
+				}
+			}
+		}
+
+		function initMap() {
+			try {
+				if (typeof L === 'undefined') {
+					console.error("Leaflet library not loaded!");
+					return;
+				}
+
+				resizeMap();
+
+				map = L.map('map', {
+					center: [currentLat, currentLng],
+					zoom: 15,
+					zoomControl: true,
+					attributionControl: true
+				});
+
+				var primaryLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+					maxZoom: 19,
+					attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+				});
+
+				primaryLayer.on('load', function() {
+					var loadEl = document.getElementById('loading');
+					if (loadEl) loadEl.style.display = 'none';
+				});
+
+				primaryLayer.on('tileerror', function(err) {
+					console.error("Tile load error: ", err);
+				});
+
+				primaryLayer.addTo(map);
+
+				marker = L.marker([currentLat, currentLng], {
+					icon: customPin,
+					draggable: true
+				}).addTo(map);
+
+				circle = L.circle([currentLat, currentLng], {
+					color: '#3B82F6',
+					fillColor: '#3B82F6',
+					fillOpacity: 0.22,
+					weight: 2,
+					radius: currentRadius
+				}).addTo(map);
+
+				marker.on('drag', function(e) {
+					var pos = e.target.getLatLng();
+					circle.setLatLng(pos);
+					if (window.AndroidBridge && window.AndroidBridge.onMarkerMoved) {
+						window.AndroidBridge.onMarkerMoved(pos.lat, pos.lng);
+					}
+				});
+
+				marker.on('dragend', function(e) {
+					var pos = e.target.getLatLng();
+					map.panTo(pos);
+				});
+
+				map.on('click', function(e) {
+					marker.setLatLng(e.latlng);
+					circle.setLatLng(e.latlng);
+					map.panTo(e.latlng);
+					if (window.AndroidBridge && window.AndroidBridge.onMarkerMoved) {
+						window.AndroidBridge.onMarkerMoved(e.latlng.lat, e.latlng.lng);
+					}
+				});
+
+				resizeMap();
+				setTimeout(resizeMap, 100);
+				setTimeout(resizeMap, 300);
+				setTimeout(resizeMap, 700);
+			} catch (e) {
+				console.error("Map init error: " + e.message);
+			}
+		}
+
+		window.addEventListener('resize', resizeMap);
+
+		function setInitialLocation(lat, lng, radius) {
+			currentLat = lat;
+			currentLng = lng;
+			currentRadius = radius;
+			resizeMap();
+			if (map && marker && circle) {
+				marker.setLatLng([lat, lng]);
+				circle.setLatLng([lat, lng]);
+				circle.setRadius(radius);
+				map.setView([lat, lng], 15);
+				map.invalidateSize();
+			}
+		}
+
+		function setCoordinates(lat, lng) {
+			currentLat = lat;
+			currentLng = lng;
+			resizeMap();
+			if (marker && circle && map) {
+				marker.setLatLng([lat, lng]);
+				circle.setLatLng([lat, lng]);
+				map.panTo([lat, lng]);
+				map.invalidateSize();
+			}
+		}
+
+		function setRadius(radiusMeters) {
+			currentRadius = radiusMeters;
+			if (circle) {
+				circle.setRadius(radiusMeters);
+			}
+		}
+
+		if (document.readyState === 'complete' || document.readyState === 'interactive') {
+			initMap();
+		} else {
+			window.addEventListener('DOMContentLoaded', initMap);
+		}
+	</script>
+</body>
+</html>

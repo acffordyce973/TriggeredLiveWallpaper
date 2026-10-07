@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">Triggered Wallpaper</string>
+    <string name="wallpaper_description">Dynamic Live Wallpaper triggered by orientation, foldable posture, time, location geofences, charging, and gestures.</string>
+    <string name="quick_tile_label">Wallpaper Override</string>
+    <string name="quick_tile_description">Toggle Quick Settings set override</string>
+    <string name="quick_tile_next_label">Next Wallpaper</string>
+    <string name="quick_tile_next_description">Tap to cycle to the next triggered wallpaper</string>
+    <string name="quick_tile_override_label">Wallpaper Override</string>
+    <string name="quick_tile_override_description">Toggle Quick Settings set override</string>
+</resources>
