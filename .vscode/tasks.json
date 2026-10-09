@@ -24,7 +24,7 @@
 			"problemMatcher": []
 		},
 		{
-			"label": "Run App on Tablet (Titan 1)",
+			"label": "Run App on ADB Device",
 			"type": "shell",
 			"command": "powershell",
 			"args": [
@@ -32,31 +32,7 @@
 				"-ExecutionPolicy",
 				"Bypass",
 				"-File",
-				"${workspaceFolder}/.vscode/RunOnTablet.ps1",
-				"-stringDeviceId",
-				"DHF8256CS26070032"
-			],
-			"group": {
-				"kind": "build",
-				"isDefault": false
-			},
-			"presentation": {
-				"reveal": "always",
-				"panel": "shared",
-				"focus": false
-			},
-			"problemMatcher": []
-		},
-		{
-			"label": "Run App on Connected Device (Auto-detect)",
-			"type": "shell",
-			"command": "powershell",
-			"args": [
-				"-NoProfile",
-				"-ExecutionPolicy",
-				"Bypass",
-				"-File",
-				"${workspaceFolder}/.vscode/RunOnTablet.ps1",
+				"${workspaceFolder}/.vscode/RunAdbDevice.ps1",
 				"-stringDeviceId",
 				"auto"
 			],
@@ -72,7 +48,7 @@
 			"problemMatcher": []
 		},
 		{
-			"label": "Start Android Emulator",
+			"label": "Start Emulated Device",
 			"type": "shell",
 			"command": "powershell",
 			"args": [
@@ -82,7 +58,7 @@
 				"-File",
 				"${workspaceFolder}/.vscode/LaunchEmulator.ps1",
 				"-stringAvdName",
-				"Medium_Phone_API_36.1"
+				"auto"
 			],
 			"presentation": {
 				"reveal": "always",
@@ -92,7 +68,7 @@
 			"problemMatcher": []
 		},
 		{
-			"label": "Run App on Emulator",
+			"label": "Run App on Emulated Device",
 			"type": "shell",
 			"command": "powershell",
 			"args": [
@@ -102,7 +78,7 @@
 				"-File",
 				"${workspaceFolder}/.vscode/RunApp.ps1",
 				"-stringAvdName",
-				"Medium_Phone_API_36.1"
+				"auto"
 			],
 			"group": {
 				"kind": "build",
@@ -156,65 +132,6 @@
 				"kind": "test",
 				"isDefault": true
 			},
-			"presentation": {
-				"reveal": "always",
-				"panel": "shared"
-			},
-			"problemMatcher": []
-		},
-		{
-			"label": "Set as Live Wallpaper on Tablet",
-			"type": "shell",
-			"command": "adb",
-			"args": [
-				"-s",
-				"DHF8256CS26070032",
-				"shell",
-				"am",
-				"start",
-				"-a",
-				"android.service.wallpaper.CHANGE_LIVE_WALLPAPER",
-				"-e",
-				"android.service.wallpaper.extra.LIVE_WALLPAPER_COMPONENT",
-				"com.antigravity.triggeredwallpaper/.service.TriggeredWallpaperService"
-			],
-			"presentation": {
-				"reveal": "always",
-				"panel": "shared"
-			},
-			"problemMatcher": []
-		},
-		{
-			"label": "Trigger Wallpaper Shuffle on Tablet",
-			"type": "shell",
-			"command": "adb",
-			"args": [
-				"-s",
-				"DHF8256CS26070032",
-				"shell",
-				"am",
-				"broadcast",
-				"-a",
-				"com.antigravity.triggeredwallpaper.TRIGGER_NEXT"
-			],
-			"presentation": {
-				"reveal": "always",
-				"panel": "shared"
-			},
-			"problemMatcher": []
-		},
-		{
-			"label": "View Tablet Logcat",
-			"type": "shell",
-			"command": "adb",
-			"args": [
-				"-s",
-				"DHF8256CS26070032",
-				"logcat",
-				"-v",
-				"time",
-				"com.antigravity.triggeredwallpaper:*"
-			],
 			"presentation": {
 				"reveal": "always",
 				"panel": "shared"

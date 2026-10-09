@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-	Builds the Triggered Wallpaper debug APK, installs it onto the connected Android tablet via ADB, and launches the app.
+	Builds the Triggered Wallpaper debug APK, installs it onto the connected ADB device, and launches the app.
 #>
 param (
 	[string]$stringDeviceId = "auto"
@@ -31,7 +31,7 @@ foreach ($match in $listRawDevices) {
 }
 
 if ($listConnectedDevices.Count -eq 0) {
-	Write-Error "No connected ADB devices detected. Please make sure USB debugging is enabled on your tablet and the USB cable is plugged in."
+	Write-Error "No connected ADB devices detected. Please make sure USB debugging is enabled on your device and the USB cable is plugged in."
 	exit 1
 }
 
@@ -70,7 +70,7 @@ if ($LASTEXITCODE -ne 0) {
 	exit $LASTEXITCODE
 }
 
-# 4. Install onto target tablet
+# 4. Install onto target device
 $fileApk = "$projectDir\app\build\outputs\apk\debug\app-debug.apk"
 if (-not (Test-Path $fileApk)) {
 	Write-Error "Could not find built APK at '$fileApk'."

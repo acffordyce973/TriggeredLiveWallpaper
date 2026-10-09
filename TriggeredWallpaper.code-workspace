@@ -17,43 +17,39 @@
 		"version": "0.2.0",
 		"configurations": [
 			{
-				"name": "Run App on Tablet (Titan 1)",
+				"name": "Build Release APK",
 				"type": "PowerShell",
 				"request": "launch",
-				"script": "${workspaceFolder}/.vscode/RunOnTablet.ps1",
-				"args": [
-					"-stringDeviceId",
-					"DHF8256CS26070032"
-				]
+				"script": "${workspaceFolder}/.vscode/BuildRelease.ps1"
 			},
 			{
-				"name": "Run App on Connected Device (Auto-detect)",
+				"name": "Run App on ADB Device",
 				"type": "PowerShell",
 				"request": "launch",
-				"script": "${workspaceFolder}/.vscode/RunOnTablet.ps1",
+				"script": "${workspaceFolder}/.vscode/RunAdbDevice.ps1",
 				"args": [
 					"-stringDeviceId",
 					"auto"
 				]
 			},
 			{
-				"name": "Run App on Emulator",
-				"type": "PowerShell",
-				"request": "launch",
-				"script": "${workspaceFolder}/.vscode/RunApp.ps1",
-				"args": [
-					"-stringAvdName",
-					"Medium_Phone_API_36.1"
-				]
-			},
-			{
-				"name": "Launch Android Emulator",
+				"name": "Start Emulated Device",
 				"type": "PowerShell",
 				"request": "launch",
 				"script": "${workspaceFolder}/.vscode/LaunchEmulator.ps1",
 				"args": [
 					"-stringAvdName",
-					"Medium_Phone_API_36.1"
+					"auto"
+				]
+			},
+			{
+				"name": "Run App on Emulated Device",
+				"type": "PowerShell",
+				"request": "launch",
+				"script": "${workspaceFolder}/.vscode/RunApp.ps1",
+				"args": [
+					"-stringAvdName",
+					"auto"
 				]
 			}
 		]

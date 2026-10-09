@@ -1,9 +1,10 @@
 <#
 .SYNOPSIS
 	Ensures the Android emulator is running, installs the debug APK, and launches Triggered Wallpaper.
+	Automatically detects installed AVDs or defaults to "Emulated".
 #>
 param (
-	[string]$stringAvdName = "Medium_Phone_API_36.1"
+	[string]$stringAvdName = "auto"
 )
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -21,12 +22,19 @@ if ($LASTEXITCODE -ne 0) {
 	exit $LASTEXITCODE
 }
 
-# 3. Launch MainActivity
-Write-Host "Launching Triggered Wallpaper app on device..."
+# 3. Launch MainActivity on the emulated device
+Write-Host "Launching Triggered Wallpaper app on emulated device..."
 $fileAdb = "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe"
 if (-not (Test-Path $fileAdb)) {
 	$fileAdb = (Get-Command adb -ErrorAction SilentlyContinue).Source
 }
-& $fileAdb shell am start -n "com.antigravity.triggeredwallpaper/.MainActivity"
 
-Write-Host "Triggered Wallpaper launched successfully on emulator!"
+$stringEmulatorDevice = (& $fileAdb devices 2>$null | Select-String "emulator-\d+\s+device" | ForEach-Object { ($_ -split '\s+')[0] } | Select-Object -First 1)
+
+if ($stringEmulatorDevice) {
+	& $fileAdb -s $stringEmulatorDevice shell am start -n "com.antigravity.triggeredwallpaper/.MainActivity"
+} else {
+	& $fileAdb shell am start -n "com.antigravity.triggeredwallpaper/.MainActivity"
+}
+
+Write-Host "Triggered Wallpaper launched successfully on emulated device!"
