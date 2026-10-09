@@ -2,12 +2,6 @@
 	"version": "0.2.0",
 	"configurations": [
 		{
-			"name": "Build Release APK",
-			"type": "PowerShell",
-			"request": "launch",
-			"script": "${workspaceFolder}/.vscode/BuildRelease.ps1"
-		},
-		{
 			"name": "Run App on ADB Device",
 			"type": "PowerShell",
 			"request": "launch",

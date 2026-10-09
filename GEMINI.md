@@ -26,9 +26,9 @@
 		- `OpenImageActivity.kt`: Lightweight trampoline activity to view the current wallpaper in external gallery apps.
 - `.github/workflows/`:
 	- `github-actions.yml`: CI/CD workflow mirroring PSO2 Alert to build signed release APKs and publish GitHub releases upon tag push.
-- Scripts:
+- Scripts & Tooling:
 	- `BuildDebug.bat`: One-click command to compile the debug APK (`./gradlew assembleDebug`).
-	- `BuildRelease.bat`: One-click command to compile and deploy signed release APK to local staging.
+	- Releases: Automated via GitHub Actions on tag push (local `BuildRelease` scripts are no longer needed or maintained).
 
 ---
 

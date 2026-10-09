@@ -2,28 +2,6 @@
 	"version": "2.0.0",
 	"tasks": [
 		{
-			"label": "Build Release APK",
-			"type": "shell",
-			"command": "powershell",
-			"args": [
-				"-NoProfile",
-				"-ExecutionPolicy",
-				"Bypass",
-				"-File",
-				"${workspaceFolder}/.vscode/BuildRelease.ps1"
-			],
-			"group": {
-				"kind": "build",
-				"isDefault": false
-			},
-			"presentation": {
-				"reveal": "always",
-				"panel": "shared",
-				"focus": true
-			},
-			"problemMatcher": []
-		},
-		{
 			"label": "Run App on ADB Device",
 			"type": "shell",
 			"command": "powershell",

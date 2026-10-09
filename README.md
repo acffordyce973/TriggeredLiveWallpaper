@@ -126,11 +126,11 @@ The table below explains why each declared permission in `AndroidManifest.xml` i
   ```bash
   ./gradlew assembleDebug
   ```
-- **Release Build:** Run `BuildRelease.bat` from the project root or use Gradle:
+- **Release Build (CI/CD):** Production release APKs are automatically compiled, signed, and published to GitHub Releases via **GitHub Actions** upon pushing a version tag:
   ```bash
-  ./gradlew assembleRelease
+  git tag 1.1.2
+  git push origin 1.1.2
   ```
-  *(Release builds require a valid `keystore.properties` and keystore file).*
 
 ---
 
