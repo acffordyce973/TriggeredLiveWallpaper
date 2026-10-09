@@ -77,6 +77,7 @@ Whenever you make changes to this codebase, you **MUST** uphold the following do
 	- New features / triggers / conditions: Bump **minor** (`1.1.1` → `1.2.0`).
 	- Bug fixes, optimizations, UI polish: Bump **revision** (`1.1.1` → `1.1.2`).
 - Always increment `versionCode` alongside `versionName`.
+- **Push & Release Tagging:** When the version is incremented and changes are committed, the AI assistant **must push commits to GitHub** (`git push origin <branch>`) and **push a git tag for that version** (`git tag <version>` and `git push origin <version>`) so that GitHub Actions triggers and builds the new release.
 
 ---
 
