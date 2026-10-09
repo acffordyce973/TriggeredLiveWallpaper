@@ -1,0 +1,15 @@
+{
+	"terminal.integrated.defaultProfile.windows": "PowerShell",
+	"files.exclude": {
+		"**/.git": true,
+		"**/.gradle": true
+	},
+	"gradle.autoDetect": "off",
+	"java.server.launchMode": "LightWeight",
+	"java.jdt.ls.androidSupport.enabled": "off",
+	"java.project.importOnFirstTimeStartup": "disabled",
+	"java.configuration.updateBuildConfiguration": "disabled",
+	"java.autobuild.enabled": false,
+	"java.import.projectSelection": "manual",
+	"java.jdt.ls.vmargs": "-XX:+UseParallelGC -Xmx256m -Xms64m"
+}

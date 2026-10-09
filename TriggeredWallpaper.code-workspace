@@ -11,7 +11,14 @@
 			"**/.git": true,
 			"**/.gradle": true
 		},
-		"java.configuration.updateBuildConfiguration": "interactive"
+		"gradle.autoDetect": "off",
+		"java.server.launchMode": "LightWeight",
+		"java.jdt.ls.androidSupport.enabled": "off",
+		"java.project.importOnFirstTimeStartup": "disabled",
+		"java.configuration.updateBuildConfiguration": "disabled",
+		"java.autobuild.enabled": false,
+		"java.import.projectSelection": "manual",
+		"java.jdt.ls.vmargs": "-XX:+UseParallelGC -Xmx256m -Xms64m"
 	},
 	"launch": {
 		"version": "0.2.0",
