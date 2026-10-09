@@ -251,13 +251,37 @@ object DeviceStateManager {
 		return FoldCondition.ANY
 	}
 
-	fun getDeviceState(context: Context, overrideOrientation: OrientationCondition? = null): DeviceState {
-		val boolIsLandscape = if (overrideOrientation != null && overrideOrientation != OrientationCondition.ANY) {
-			overrideOrientation == OrientationCondition.LANDSCAPE
-		} else {
-			context.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+	fun getDeviceOrientation(context: Context): OrientationCondition {
+		val intConfigOrientation = context.resources.configuration.orientation
+		if (intConfigOrientation == Configuration.ORIENTATION_LANDSCAPE) {
+			return OrientationCondition.LANDSCAPE
 		}
-		val orientation = if (boolIsLandscape) OrientationCondition.LANDSCAPE else OrientationCondition.PORTRAIT
+		if (intConfigOrientation == Configuration.ORIENTATION_PORTRAIT) {
+			return OrientationCondition.PORTRAIT
+		}
+
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+			val objWindowManager = context.getSystemService(Context.WINDOW_SERVICE) as? android.view.WindowManager
+			val objBounds = objWindowManager?.currentWindowMetrics?.bounds
+			if (objBounds != null) {
+				return if (objBounds.width() > objBounds.height()) {
+					OrientationCondition.LANDSCAPE
+				} else {
+					OrientationCondition.PORTRAIT
+				}
+			}
+		}
+
+		val objDisplayMetrics = context.resources.displayMetrics
+		return if (objDisplayMetrics.widthPixels > objDisplayMetrics.heightPixels) {
+			OrientationCondition.LANDSCAPE
+		} else {
+			OrientationCondition.PORTRAIT
+		}
+	}
+
+	fun getDeviceState(context: Context): DeviceState {
+		val orientation = getDeviceOrientation(context)
 
 		val intentBattery = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
 		val intStatus = intentBattery?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1

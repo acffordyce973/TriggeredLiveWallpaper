@@ -28,8 +28,7 @@ class WallpaperActionReceiver : BroadcastReceiver() {
 
 		suspend fun advanceToNextImage(
 			context: Context,
-			boolForceNext: Boolean = true,
-			overrideOrientation: com.antigravity.triggeredwallpaper.model.OrientationCondition? = null
+			boolForceNext: Boolean = true
 		) {
 			advanceMutex.withLock {
 				val longNow = System.currentTimeMillis()
@@ -42,7 +41,7 @@ class WallpaperActionReceiver : BroadcastReceiver() {
 				val listSets = repository.flowFolderSets.value
 				val listGeos = repository.flowGeofences.value
 				val objSettings = repository.flowSettings.value
-				val objCurrentState = DeviceStateManager.getDeviceState(context, overrideOrientation)
+				val objCurrentState = DeviceStateManager.getDeviceState(context)
 
 				// 1. Evaluate Home Screen
 				val objMatchedHomeSet = ConditionEvaluator.evaluateMatchingSet(
@@ -57,7 +56,7 @@ class WallpaperActionReceiver : BroadcastReceiver() {
 					(boolForceNext || boolHomeSetChanged || objSettings.stringCurrentHomeImageUri == null)
 
 				var objNextHomeImage: ImageItem? = null
-				if (boolNeedNewHomeImage && objMatchedHomeSet != null) {
+				if (boolNeedNewHomeImage) {
 					objNextHomeImage = repository.selectNextImage(objMatchedHomeSet)
 				}
 
@@ -76,7 +75,7 @@ class WallpaperActionReceiver : BroadcastReceiver() {
 					val boolNeedNewLockImage = objMatchedLockSet != null &&
 						(boolForceNext || boolLockSetChanged || objSettings.stringCurrentLockImageUri == null)
 
-					if (boolNeedNewLockImage && objMatchedLockSet != null) {
+					if (boolNeedNewLockImage) {
 						objNextLockImage = repository.selectNextImage(objMatchedLockSet)
 					}
 				} else {

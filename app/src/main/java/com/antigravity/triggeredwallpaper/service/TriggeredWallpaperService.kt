@@ -32,8 +32,10 @@ import com.antigravity.triggeredwallpaper.receiver.WallpaperActionReceiver
 import com.antigravity.triggeredwallpaper.scheduler.WallpaperAlarmScheduler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -59,11 +61,14 @@ class TriggeredWallpaperService : WallpaperService() {
 	}
 
 	private val serviceScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+	private var jobConfigurationChange: Job? = null
 
 	override fun onConfigurationChanged(newConfig: Configuration) {
 		super.onConfigurationChanged(newConfig)
-		// On rotation or fold state change, check if set or orientation changed
-		serviceScope.launch(Dispatchers.IO) {
+		// On rotation or fold state change, debounce to allow rotation animation to settle
+		jobConfigurationChange?.cancel()
+		jobConfigurationChange = serviceScope.launch(Dispatchers.IO) {
+			delay(400L)
 			val repository = WallpaperRepository.getInstance(applicationContext)
 			val objCurrentState = DeviceStateManager.getDeviceState(applicationContext)
 			val objSettings = repository.flowSettings.value
@@ -89,6 +94,7 @@ class TriggeredWallpaperService : WallpaperService() {
 
 	override fun onDestroy() {
 		super.onDestroy()
+		jobConfigurationChange?.cancel()
 		serviceScope.cancel()
 	}
 
@@ -229,12 +235,7 @@ class TriggeredWallpaperService : WallpaperService() {
 			val listSets = objRepository.flowFolderSets.value
 			val listGeos = objRepository.flowGeofences.value
 
-			val currentSurfaceOrientation = when {
-				intSurfaceWidth > intSurfaceHeight -> com.antigravity.triggeredwallpaper.model.OrientationCondition.LANDSCAPE
-				intSurfaceHeight > intSurfaceWidth -> com.antigravity.triggeredwallpaper.model.OrientationCondition.PORTRAIT
-				else -> null
-			}
-			val objCurrentState = DeviceStateManager.getDeviceState(applicationContext, currentSurfaceOrientation)
+			val objCurrentState = DeviceStateManager.getDeviceState(applicationContext)
 
 			// Check Home screen match
 			val objMatchedHomeSet = ConditionEvaluator.evaluateMatchingSet(
@@ -267,8 +268,7 @@ class TriggeredWallpaperService : WallpaperService() {
 			if (boolHomeSetChanged || boolHomeOrientationMismatch || boolHomeFoldMismatch || boolLockFoldMismatch) {
 				WallpaperActionReceiver.advanceToNextImage(
 					applicationContext,
-					boolForceNext = false,
-					overrideOrientation = currentSurfaceOrientation
+					boolForceNext = false
 				)
 			}
 		}
@@ -283,7 +283,7 @@ class TriggeredWallpaperService : WallpaperService() {
 				engineScope.launch {
 					syncBitmapsAndDraw(objRepository.flowSettings.value, boolForceReload = true)
 				}
-				scheduleDelayedConditionCheck(1000L)
+				scheduleDelayedConditionCheck(600L)
 			} else {
 				drawFrame()
 			}
