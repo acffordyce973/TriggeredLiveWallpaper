@@ -6,6 +6,7 @@ import com.antigravity.triggeredwallpaper.model.FolderSet
 import com.antigravity.triggeredwallpaper.model.GeofenceArea
 import com.antigravity.triggeredwallpaper.model.ImageItem
 import com.antigravity.triggeredwallpaper.model.WallpaperTarget
+import com.antigravity.triggeredwallpaper.scheduler.WallpaperGeofenceScheduler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -66,6 +67,7 @@ class WallpaperRepository private constructor(private val appContext: Context) {
 						_flowFolderSets.value = objData.listFolderSets
 						_flowGeofences.value = objData.listGeofences
 						_flowSettings.value = objData.objSettings
+						WallpaperGeofenceScheduler.synchronizeGeofences(appContext, objData.listGeofences)
 					} else {
 						// Create initial sample configuration
 						val objInitialData = WallpaperConfigData(
@@ -98,6 +100,7 @@ class WallpaperRepository private constructor(private val appContext: Context) {
 						_flowFolderSets.value = objInitialData.listFolderSets
 						_flowGeofences.value = objInitialData.listGeofences
 						_flowSettings.value = objInitialData.objSettings
+						WallpaperGeofenceScheduler.synchronizeGeofences(appContext, objInitialData.listGeofences)
 					}
 				} catch (e: Exception) {
 					e.printStackTrace()
@@ -174,6 +177,7 @@ class WallpaperRepository private constructor(private val appContext: Context) {
 					objSettings = _flowSettings.value
 				)
 			)
+			WallpaperGeofenceScheduler.synchronizeGeofences(appContext, listCurrent)
 		}
 	}
 
@@ -189,6 +193,7 @@ class WallpaperRepository private constructor(private val appContext: Context) {
 					objSettings = _flowSettings.value
 				)
 			)
+			WallpaperGeofenceScheduler.synchronizeGeofences(appContext, listCurrent)
 		}
 	}
 
@@ -224,6 +229,7 @@ class WallpaperRepository private constructor(private val appContext: Context) {
 				_flowSettings.value = objData.objSettings
 				saveConfigInternal(objData)
 				clearImageCache()
+				WallpaperGeofenceScheduler.synchronizeGeofences(appContext, objData.listGeofences)
 				true
 			} catch (e: Exception) {
 				e.printStackTrace()

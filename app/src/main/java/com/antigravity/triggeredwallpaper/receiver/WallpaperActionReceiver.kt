@@ -63,6 +63,7 @@ class WallpaperActionReceiver : BroadcastReceiver() {
 				// 2. Evaluate Lock Screen (if separated)
 				var objNextLockImage: ImageItem? = null
 				var objMatchedLockSet: com.antigravity.triggeredwallpaper.model.FolderSet? = null
+				var boolLockSetChanged = false
 				if (objSettings.boolSeparateHomeAndLock) {
 					objMatchedLockSet = ConditionEvaluator.evaluateMatchingSet(
 						objCurrentState,
@@ -71,7 +72,7 @@ class WallpaperActionReceiver : BroadcastReceiver() {
 						listGeos,
 						objSettings
 					)
-					val boolLockSetChanged = objMatchedLockSet?.stringId != objSettings.stringCurrentLockSetId
+					boolLockSetChanged = objMatchedLockSet?.stringId != objSettings.stringCurrentLockSetId
 					val boolNeedNewLockImage = objMatchedLockSet != null &&
 						(boolForceNext || boolLockSetChanged || objSettings.stringCurrentLockImageUri == null)
 
@@ -83,7 +84,7 @@ class WallpaperActionReceiver : BroadcastReceiver() {
 					objNextLockImage = objNextHomeImage
 				}
 
-				if (objNextHomeImage != null || objNextLockImage != null || boolHomeSetChanged) {
+				if (objNextHomeImage != null || objNextLockImage != null || boolHomeSetChanged || boolLockSetChanged) {
 					repository.updateAppSettings { current ->
 						val stringNewHomeSetId = objMatchedHomeSet?.stringId ?: current.stringCurrentHomeSetId
 						val stringNewHomeUri = objNextHomeImage?.stringUri ?: current.stringCurrentHomeImageUri

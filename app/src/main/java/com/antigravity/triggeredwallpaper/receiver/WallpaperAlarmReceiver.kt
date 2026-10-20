@@ -13,6 +13,7 @@ import com.antigravity.triggeredwallpaper.engine.DeviceStateManager
 import com.antigravity.triggeredwallpaper.model.WallpaperTarget
 import com.antigravity.triggeredwallpaper.notification.WallpaperNotificationManager
 import com.antigravity.triggeredwallpaper.scheduler.WallpaperAlarmScheduler
+import com.antigravity.triggeredwallpaper.scheduler.WallpaperGeofenceScheduler
 import com.antigravity.triggeredwallpaper.service.TriggeredWallpaperService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -22,6 +23,14 @@ class WallpaperAlarmReceiver : BroadcastReceiver() {
 
 	override fun onReceive(context: Context, intent: Intent) {
 		val stringAction = intent.action
+		if (stringAction == Intent.ACTION_BOOT_COMPLETED ||
+			stringAction == Intent.ACTION_MY_PACKAGE_REPLACED ||
+			stringAction == "android.intent.action.QUICKBOOT_POWERON"
+		) {
+			val repository = WallpaperRepository.getInstance(context)
+			WallpaperGeofenceScheduler.synchronizeGeofences(context, repository.flowGeofences.value)
+		}
+
 		if (stringAction == Intent.ACTION_POWER_CONNECTED || stringAction == Intent.ACTION_POWER_DISCONNECTED) {
 			val repository = WallpaperRepository.getInstance(context)
 			val objCurrentState = DeviceStateManager.getDeviceState(context)

@@ -30,6 +30,7 @@ import com.antigravity.triggeredwallpaper.model.WallpaperTarget
 import com.antigravity.triggeredwallpaper.notification.WallpaperNotificationManager
 import com.antigravity.triggeredwallpaper.receiver.WallpaperActionReceiver
 import com.antigravity.triggeredwallpaper.scheduler.WallpaperAlarmScheduler
+import com.antigravity.triggeredwallpaper.scheduler.WallpaperGeofenceScheduler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -149,7 +150,28 @@ class TriggeredWallpaperService : WallpaperService() {
 						// Give the window manager / launcher 1.2s to settle into portrait, then double-check conditions
 						scheduleDelayedConditionCheck(1200L)
 					}
-					Intent.ACTION_SCREEN_ON, Intent.ACTION_SCREEN_OFF -> {
+					Intent.ACTION_SCREEN_ON -> {
+						drawFrame()
+						val objCurrentState = DeviceStateManager.getDeviceState(applicationContext)
+						val listSets = objRepository.flowFolderSets.value
+						val listGeos = objRepository.flowGeofences.value
+						val objHomeSet = ConditionEvaluator.evaluateMatchingSet(
+							objCurrentState,
+							WallpaperTarget.HOME,
+							listSets,
+							listGeos,
+							objRepository.flowSettings.value
+						)
+						val boolChangeOnScreenOn = objHomeSet?.boolChangeOnScreenOn ?: false
+						if (boolChangeOnScreenOn) {
+							engineScope.launch(Dispatchers.IO) {
+								WallpaperActionReceiver.advanceToNextImage(applicationContext, boolForceNext = true)
+							}
+						} else {
+							scheduleDelayedConditionCheck(400L)
+						}
+					}
+					Intent.ACTION_SCREEN_OFF -> {
 						drawFrame()
 					}
 				}
@@ -173,8 +195,9 @@ class TriggeredWallpaperService : WallpaperService() {
 				registerReceiver(stateReceiver, filter)
 			}
 
-			// Schedule alarms and notification once
+			// Schedule alarms, geofences, and notification once
 			WallpaperAlarmScheduler.scheduleNextAlarm(applicationContext)
+			WallpaperGeofenceScheduler.synchronizeGeofences(applicationContext, objRepository.flowGeofences.value)
 
 			// Observe settings for live wallpaper updates
 			engineScope.launch {
@@ -187,6 +210,37 @@ class TriggeredWallpaperService : WallpaperService() {
 			engineScope.launch {
 				DeviceStateManager.flowFoldCondition.collectLatest {
 					checkAndReevaluateConditions()
+				}
+			}
+
+			// Observe location changes for immediate geofence adaptation
+			engineScope.launch {
+				var lastEvaluatedLat: Double? = null
+				var lastEvaluatedLng: Double? = null
+				DeviceStateManager.flowLocation.collectLatest { objLocation ->
+					if (objLocation != null) {
+						val doubleLat = objLocation.latitude
+						val doubleLng = objLocation.longitude
+						val boolSignificantMove = if (lastEvaluatedLat != null && lastEvaluatedLng != null) {
+							val arrayDistances = FloatArray(1)
+							android.location.Location.distanceBetween(
+								lastEvaluatedLat!!,
+								lastEvaluatedLng!!,
+								doubleLat,
+								doubleLng,
+								arrayDistances
+							)
+							arrayDistances[0] >= 20f
+						} else {
+							true
+						}
+
+						if (boolSignificantMove) {
+							lastEvaluatedLat = doubleLat
+							lastEvaluatedLng = doubleLng
+							checkAndReevaluateConditions()
+						}
+					}
 				}
 			}
 
@@ -256,16 +310,38 @@ class TriggeredWallpaperService : WallpaperService() {
 				objCurrentHomeSet.foldCondition != com.antigravity.triggeredwallpaper.model.FoldCondition.ANY &&
 				objCurrentHomeSet.foldCondition != objCurrentState.foldCondition
 
-			val boolLockFoldMismatch = if (objSettings.boolSeparateHomeAndLock) {
-				val objCurrentLockSet = listSets.find { it.stringId == objSettings.stringCurrentLockSetId }
-				objCurrentLockSet != null &&
-					objCurrentLockSet.foldCondition != com.antigravity.triggeredwallpaper.model.FoldCondition.ANY &&
-					objCurrentLockSet.foldCondition != objCurrentState.foldCondition
+			// Check Lock screen match
+			val objMatchedLockSet = if (objSettings.boolSeparateHomeAndLock) {
+				ConditionEvaluator.evaluateMatchingSet(
+					objCurrentState,
+					WallpaperTarget.LOCK,
+					listSets,
+					listGeos,
+					objSettings
+				)
+			} else {
+				null
+			}
+			val boolLockSetChanged = if (objSettings.boolSeparateHomeAndLock) {
+				objMatchedLockSet?.stringId != objSettings.stringCurrentLockSetId
 			} else {
 				false
 			}
 
-			if (boolHomeSetChanged || boolHomeOrientationMismatch || boolHomeFoldMismatch || boolLockFoldMismatch) {
+			val objCurrentLockSet = if (objSettings.boolSeparateHomeAndLock) {
+				listSets.find { it.stringId == objSettings.stringCurrentLockSetId }
+			} else {
+				null
+			}
+			val boolLockOrientationMismatch = objCurrentLockSet != null &&
+				objCurrentLockSet.orientationCondition != com.antigravity.triggeredwallpaper.model.OrientationCondition.ANY &&
+				objCurrentLockSet.orientationCondition != objCurrentState.orientationCondition
+
+			val boolLockFoldMismatch = objCurrentLockSet != null &&
+				objCurrentLockSet.foldCondition != com.antigravity.triggeredwallpaper.model.FoldCondition.ANY &&
+				objCurrentLockSet.foldCondition != objCurrentState.foldCondition
+
+			if (boolHomeSetChanged || boolLockSetChanged || boolHomeOrientationMismatch || boolLockOrientationMismatch || boolHomeFoldMismatch || boolLockFoldMismatch) {
 				WallpaperActionReceiver.advanceToNextImage(
 					applicationContext,
 					boolForceNext = false

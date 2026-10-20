@@ -49,6 +49,11 @@ object DeviceStateManager {
 	private val _flowLocation = MutableStateFlow<Location?>(null)
 	val flowLocation: StateFlow<Location?> = _flowLocation.asStateFlow()
 
+	fun updateLocation(location: Location) {
+		cachedBestLocation = location
+		_flowLocation.value = location
+	}
+
 	fun initialize(appContext: Context) {
 		initFoldListeners(appContext)
 		initLocationListener(appContext)
@@ -159,11 +164,14 @@ object DeviceStateManager {
 		}
 
 		try {
-			val listProviders = listOf(
+			val listProviders = mutableListOf(
 				LocationManager.GPS_PROVIDER,
 				LocationManager.NETWORK_PROVIDER,
 				LocationManager.PASSIVE_PROVIDER
 			)
+			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+				listProviders.add(0, LocationManager.FUSED_PROVIDER)
+			}
 			for (stringProvider in listProviders) {
 				if (locationManager.isProviderEnabled(stringProvider)) {
 					locationManager.requestLocationUpdates(

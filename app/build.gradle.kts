@@ -8,81 +8,78 @@ plugins {
 }
 
 val keystoreProperties = Properties()
-val fileLocalKeystoreProps = rootProject.file("keystore.properties")
-val fileSharedKeystoreProps = File(rootProject.projectDir.parentFile.parentFile, "Personal/Android KeyStore/keystore.properties")
-val fileResolvedKeystoreProps = when {
-    fileLocalKeystoreProps.exists() -> fileLocalKeystoreProps
-    fileSharedKeystoreProps.exists() -> fileSharedKeystoreProps
-    else -> null
+val fileKeystoreProps = when {
+	rootProject.file("keystore.properties").exists() -> rootProject.file("keystore.properties")
+	file("keystore.properties").exists() -> file("keystore.properties")
+	else -> null
 }
-if (fileResolvedKeystoreProps != null && fileResolvedKeystoreProps.exists()) {
-    fileResolvedKeystoreProps.inputStream().use { keystoreProperties.load(it) }
+if (fileKeystoreProps != null && fileKeystoreProps.exists()) {
+	fileKeystoreProps.inputStream().use { keystoreProperties.load(it) }
 }
 
 android {
-    namespace = "com.antigravity.triggeredwallpaper"
-    compileSdk = 36
-    defaultConfig {
-        applicationId = "com.antigravity.triggeredwallpaper"
-        minSdk = 24
-        targetSdk = 36
-        versionCode = 113
-        versionName = "1.1.3"
-    }
+	namespace = "com.antigravity.triggeredwallpaper"
+	compileSdk = 36
+	defaultConfig {
+		applicationId = "com.antigravity.triggeredwallpaper"
+		minSdk = 24
+		targetSdk = 36
+		versionCode = 120
+		versionName = "1.2.0"
+	}
 
-    signingConfigs {
-        create("release") {
-            if (keystoreProperties.containsKey("storeFile")) {
-                val stringStoreFile = keystoreProperties.getProperty("storeFile")
-                val fileStore = when {
-                    rootProject.file(stringStoreFile).exists() -> rootProject.file(stringStoreFile)
-                    File(fileResolvedKeystoreProps?.parentFile, stringStoreFile).exists() -> File(fileResolvedKeystoreProps?.parentFile, stringStoreFile)
-                    else -> file(stringStoreFile)
-                }
-                storeFile = fileStore
-                storePassword = keystoreProperties.getProperty("storePassword")
-                keyAlias = keystoreProperties.getProperty("keyAlias")
-                keyPassword = keystoreProperties.getProperty("keyPassword")
-            } else {
-                val debugSigning = signingConfigs.getByName("debug")
-                storeFile = debugSigning.storeFile
-                storePassword = debugSigning.storePassword
-                keyAlias = debugSigning.keyAlias
-                keyPassword = debugSigning.keyPassword
-            }
-        }
-    }
+	signingConfigs {
+		create("release") {
+			if (keystoreProperties.containsKey("storeFile")) {
+				val stringStoreFile = keystoreProperties.getProperty("storeFile")
+				val fileStore = when {
+					rootProject.file(stringStoreFile).exists() -> rootProject.file(stringStoreFile)
+					else -> file(stringStoreFile)
+				}
+				storeFile = fileStore
+				storePassword = keystoreProperties.getProperty("storePassword")
+				keyAlias = keystoreProperties.getProperty("keyAlias")
+				keyPassword = keystoreProperties.getProperty("keyPassword")
+			} else {
+				val debugSigning = signingConfigs.getByName("debug")
+				storeFile = debugSigning.storeFile
+				storePassword = debugSigning.storePassword
+				keyAlias = debugSigning.keyAlias
+				keyPassword = debugSigning.keyPassword
+			}
+		}
+	}
 
-    buildTypes {
-        debug {
-            signingConfig = signingConfigs.getByName("release")
-        }
-        release {
-            isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("release")
-            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-        }
-    }
+	buildTypes {
+		debug {
+			signingConfig = signingConfigs.getByName("release")
+		}
+		release {
+			isMinifyEnabled = false
+			signingConfig = signingConfigs.getByName("release")
+			proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+		}
+	}
 
-    lint {
-        disable += "InvalidFragmentVersionForActivityResult"
-    }
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
-    }
-    buildFeatures {
-      compose = true
-      aidl = false
-      buildConfig = false
-      shaders = false
-    }
+	lint {
+		disable += "InvalidFragmentVersionForActivityResult"
+	}
+	compileOptions {
+		sourceCompatibility = JavaVersion.VERSION_17
+		targetCompatibility = JavaVersion.VERSION_17
+	}
+	buildFeatures {
+		compose = true
+		aidl = false
+		buildConfig = false
+		shaders = false
+	}
 
-    packaging {
-      resources {
-        excludes += "/META-INF/{AL2.0,LGPL2.1}"
-      }
-    }
+	packaging {
+		resources {
+			excludes += "/META-INF/{AL2.0,LGPL2.1}"
+		}
+	}
 }
 
 kotlin {

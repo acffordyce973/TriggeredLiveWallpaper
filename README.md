@@ -66,6 +66,7 @@ Triggers determine *when* the wallpaper engine checks conditions and advances th
 - **Device Rotation:** Triggers an immediate re-evaluation and wallpaper change when rotating between portrait and landscape.
 - **Fold / Unfold:** Immediately switches wallpapers when opening or closing a foldable device.
 - **Charger Connect / Disconnect:** Reacts instantly when plugging in or unplugging power.
+- **Geofence Boundary Transition:** Automatically switches wallpapers when entering or leaving defined geographic locations (supported via hardware geofencing even while the device is locked).
 - **Quick Settings Tile - Wallpaper Override:** Toggle quick tile to lock or force a specific wallpaper set.
 - **Quick Settings Tile - Next Wallpaper:** Tap the Quick Settings tile in your notification shade to jump to the next image instantly.
 - **Notification Action Button:** Optional persistent notification with a one-tap "Next Wallpaper" button.

@@ -105,6 +105,15 @@
             </intent-filter>
         </receiver>
 
+        <!-- Background Geofence Transition Receiver -->
+        <receiver
+            android:name=".receiver.WallpaperGeofenceReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.antigravity.triggeredwallpaper.ACTION_GEOFENCE_TRANSITION" />
+            </intent-filter>
+        </receiver>
+
         <!-- FileProvider for secure URI sharing with external viewers -->
         <provider
             android:name="androidx.core.content.FileProvider"
