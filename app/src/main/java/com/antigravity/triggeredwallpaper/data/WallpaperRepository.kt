@@ -6,6 +6,7 @@ import com.antigravity.triggeredwallpaper.model.FolderSet
 import com.antigravity.triggeredwallpaper.model.GeofenceArea
 import com.antigravity.triggeredwallpaper.model.ImageItem
 import com.antigravity.triggeredwallpaper.model.WallpaperTarget
+import com.antigravity.triggeredwallpaper.scheduler.WallpaperAlarmScheduler
 import com.antigravity.triggeredwallpaper.scheduler.WallpaperGeofenceScheduler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -67,7 +68,7 @@ class WallpaperRepository private constructor(private val appContext: Context) {
 						_flowFolderSets.value = objData.listFolderSets
 						_flowGeofences.value = objData.listGeofences
 						_flowSettings.value = objData.objSettings
-						WallpaperGeofenceScheduler.synchronizeGeofences(appContext, objData.listGeofences)
+						WallpaperGeofenceScheduler.synchronizeGeofences(appContext, objData.listGeofences, objData.listFolderSets)
 					} else {
 						// Create initial sample configuration
 						val objInitialData = WallpaperConfigData(
@@ -100,7 +101,7 @@ class WallpaperRepository private constructor(private val appContext: Context) {
 						_flowFolderSets.value = objInitialData.listFolderSets
 						_flowGeofences.value = objInitialData.listGeofences
 						_flowSettings.value = objInitialData.objSettings
-						WallpaperGeofenceScheduler.synchronizeGeofences(appContext, objInitialData.listGeofences)
+						WallpaperGeofenceScheduler.synchronizeGeofences(appContext, objInitialData.listGeofences, objInitialData.listFolderSets)
 					}
 				} catch (e: Exception) {
 					e.printStackTrace()
@@ -139,6 +140,8 @@ class WallpaperRepository private constructor(private val appContext: Context) {
 					objSettings = _flowSettings.value
 				)
 			)
+			WallpaperGeofenceScheduler.synchronizeGeofences(appContext, _flowGeofences.value, listCurrent)
+			WallpaperAlarmScheduler.scheduleNextAlarm(appContext)
 		}
 	}
 
@@ -156,6 +159,8 @@ class WallpaperRepository private constructor(private val appContext: Context) {
 					objSettings = _flowSettings.value
 				)
 			)
+			WallpaperGeofenceScheduler.synchronizeGeofences(appContext, _flowGeofences.value, listCurrent)
+			WallpaperAlarmScheduler.scheduleNextAlarm(appContext)
 		}
 	}
 
@@ -177,7 +182,7 @@ class WallpaperRepository private constructor(private val appContext: Context) {
 					objSettings = _flowSettings.value
 				)
 			)
-			WallpaperGeofenceScheduler.synchronizeGeofences(appContext, listCurrent)
+			WallpaperGeofenceScheduler.synchronizeGeofences(appContext, listCurrent, _flowFolderSets.value)
 		}
 	}
 
@@ -193,13 +198,16 @@ class WallpaperRepository private constructor(private val appContext: Context) {
 					objSettings = _flowSettings.value
 				)
 			)
-			WallpaperGeofenceScheduler.synchronizeGeofences(appContext, listCurrent)
+			WallpaperGeofenceScheduler.synchronizeGeofences(appContext, listCurrent, _flowFolderSets.value)
 		}
 	}
 
 	suspend fun updateAppSettings(transform: (AppSettings) -> AppSettings) = withContext(Dispatchers.IO) {
 		objMutex.withLock {
 			val objUpdated = transform(_flowSettings.value)
+			if (objUpdated == _flowSettings.value) {
+				return@withContext
+			}
 			_flowSettings.value = objUpdated
 			saveConfigInternal(
 				WallpaperConfigData(
@@ -229,7 +237,8 @@ class WallpaperRepository private constructor(private val appContext: Context) {
 				_flowSettings.value = objData.objSettings
 				saveConfigInternal(objData)
 				clearImageCache()
-				WallpaperGeofenceScheduler.synchronizeGeofences(appContext, objData.listGeofences)
+				WallpaperGeofenceScheduler.synchronizeGeofences(appContext, objData.listGeofences, objData.listFolderSets)
+				WallpaperAlarmScheduler.scheduleNextAlarm(appContext)
 				true
 			} catch (e: Exception) {
 				e.printStackTrace()

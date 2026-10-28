@@ -87,6 +87,7 @@ object DeviceStateManager {
 		}
 
 		// 1. Register Samsung FoldStateListener via reflection
+		var boolSamsungRegistered = false
 		try {
 			val semClass = Class.forName("com.samsung.android.view.SemWindowManager")
 			val foldStateListenerClass = Class.forName("com.samsung.android.view.SemWindowManager\$FoldStateListener")
@@ -107,37 +108,51 @@ object DeviceStateManager {
 			}
 			val registerMethod = semClass.getMethod("registerFoldStateListener", foldStateListenerClass, Handler::class.java)
 			registerMethod.invoke(semInstance, proxyListener, Handler(Looper.getMainLooper()))
+			boolSamsungRegistered = true
 			Log.i(TAG, "Successfully registered Samsung FoldStateListener")
 		} catch (e: Throwable) {
 			Log.d(TAG, "Could not register Samsung FoldStateListener: ${e.message}")
 		}
 
-		// 2. Register Sensor.TYPE_HINGE_ANGLE
-		try {
-			val sensorManager = appContext.getSystemService(Context.SENSOR_SERVICE) as? SensorManager
-			val hingeSensor = sensorManager?.getDefaultSensor(Sensor.TYPE_HINGE_ANGLE)
-			if (hingeSensor != null) {
-				sensorManager.registerListener(object : SensorEventListener {
-					override fun onSensorChanged(event: SensorEvent?) {
-						val floatAngle = event?.values?.getOrNull(0) ?: return
-						floatLastHingeAngle = floatAngle
-						val condition = when {
-							floatAngle < 30f -> FoldCondition.FOLDED
-							floatAngle in 30f..150f -> FoldCondition.HALF_OPENED
-							else -> FoldCondition.UNFOLDED
+		// 2. Register Sensor.TYPE_HINGE_ANGLE only if Samsung listener is unavailable
+		if (!boolSamsungRegistered) {
+			try {
+				val sensorManager = appContext.getSystemService(Context.SENSOR_SERVICE) as? SensorManager
+				val hingeSensor = sensorManager?.getDefaultSensor(Sensor.TYPE_HINGE_ANGLE)
+				if (hingeSensor != null) {
+					sensorManager.registerListener(object : SensorEventListener {
+						override fun onSensorChanged(event: SensorEvent?) {
+							val floatAngle = event?.values?.getOrNull(0) ?: return
+							floatLastHingeAngle = floatAngle
+							val condition = when {
+								floatAngle < 30f -> FoldCondition.FOLDED
+								floatAngle in 30f..150f -> FoldCondition.HALF_OPENED
+								else -> FoldCondition.UNFOLDED
+							}
+							if (_flowFoldCondition.value != condition) {
+								_flowFoldCondition.value = condition
+							}
 						}
-						_flowFoldCondition.value = condition
-					}
 
-					override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
-				}, hingeSensor, SensorManager.SENSOR_DELAY_NORMAL)
-				Log.i(TAG, "Successfully registered Sensor.TYPE_HINGE_ANGLE listener")
+						override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+					}, hingeSensor, SensorManager.SENSOR_DELAY_UI)
+					Log.i(TAG, "Successfully registered Sensor.TYPE_HINGE_ANGLE listener")
+				}
+			} catch (e: Throwable) {
+				Log.d(TAG, "Could not register Hinge Angle sensor: ${e.message}")
 			}
-		} catch (e: Throwable) {
-			Log.d(TAG, "Could not register Hinge Angle sensor: ${e.message}")
 		}
 	}
 
+	/**
+	 * Initializes battery-efficient background location caching.
+	 *
+	 * Uses cached last known locations and zero-drain passive provider updates
+	 * instead of polling GPS hardware in the background.
+	 *
+	 * :param appContext: Application context.
+	 * :type appContext: Context
+	 */
 	@Synchronized
 	fun initLocationListener(appContext: Context) {
 		if (boolLocationListenerInitialized) return
@@ -149,44 +164,109 @@ object DeviceStateManager {
 		boolLocationListenerInitialized = true
 		val locationManager = appContext.getSystemService(Context.LOCATION_SERVICE) as? LocationManager ?: return
 
-		val locationListener = object : LocationListener {
-			override fun onLocationChanged(location: Location) {
-				if (cachedBestLocation == null || location.accuracy <= (cachedBestLocation?.accuracy ?: Float.MAX_VALUE) ||
-					location.time >= (cachedBestLocation?.time ?: 0L)
-				) {
-					cachedBestLocation = location
-					_flowLocation.value = location
-				}
+		// 1. Seed initial cached location immediately from last known without powering GPS radio
+		try {
+			val listProviders = mutableListOf<String>()
+			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+				listProviders.add(LocationManager.FUSED_PROVIDER)
 			}
-			override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) {}
-			override fun onProviderEnabled(provider: String) {}
-			override fun onProviderDisabled(provider: String) {}
+			listProviders.add(LocationManager.PASSIVE_PROVIDER)
+			listProviders.add(LocationManager.NETWORK_PROVIDER)
+			listProviders.add(LocationManager.GPS_PROVIDER)
+			for (stringProvider in listProviders) {
+				try {
+					val loc = locationManager.getLastKnownLocation(stringProvider)
+					if (loc != null) {
+						if (cachedBestLocation == null || loc.time > (cachedBestLocation?.time ?: 0L)) {
+							cachedBestLocation = loc
+							_flowLocation.value = loc
+						}
+					}
+				} catch (_: SecurityException) {}
+			}
+		} catch (e: Exception) {
+			Log.d(TAG, "Error querying initial last known location: ${e.message}")
 		}
 
+		// 2. Register zero-battery PASSIVE_PROVIDER (only receives updates when other apps query location)
 		try {
-			val listProviders = mutableListOf(
-				LocationManager.GPS_PROVIDER,
-				LocationManager.NETWORK_PROVIDER,
-				LocationManager.PASSIVE_PROVIDER
-			)
-			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-				listProviders.add(0, LocationManager.FUSED_PROVIDER)
-			}
-			for (stringProvider in listProviders) {
-				if (locationManager.isProviderEnabled(stringProvider)) {
-					locationManager.requestLocationUpdates(
-						stringProvider,
-						15000L,
-						10f,
-						locationListener,
-						Looper.getMainLooper()
-					)
+			if (locationManager.isProviderEnabled(LocationManager.PASSIVE_PROVIDER)) {
+				val passiveListener = object : LocationListener {
+					override fun onLocationChanged(location: Location) {
+						if (cachedBestLocation == null || location.accuracy <= (cachedBestLocation?.accuracy ?: Float.MAX_VALUE) ||
+							location.time >= (cachedBestLocation?.time ?: 0L)
+						) {
+							cachedBestLocation = location
+							_flowLocation.value = location
+						}
+					}
+					override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) {}
+					override fun onProviderEnabled(provider: String) {}
+					override fun onProviderDisabled(provider: String) {}
 				}
+				locationManager.requestLocationUpdates(
+					LocationManager.PASSIVE_PROVIDER,
+					60000L,
+					50f,
+					passiveListener,
+					Looper.getMainLooper()
+				)
+				Log.i(TAG, "Successfully registered zero-battery PASSIVE_PROVIDER listener")
 			}
 		} catch (e: SecurityException) {
-			Log.d(TAG, "Location permission not granted for updates: ${e.message}")
+			Log.d(TAG, "Location permission not granted for passive updates: ${e.message}")
 		} catch (e: Exception) {
-			Log.d(TAG, "Could not register location listener: ${e.message}")
+			Log.d(TAG, "Could not register passive location listener: ${e.message}")
+		}
+	}
+
+	/**
+	 * Requests a single fresh location update on demand (e.g. when opening diagnostics UI).
+	 *
+	 * :param context: Context instance.
+	 * :type context: Context
+	 */
+	fun requestSingleLocation(context: Context) {
+		val boolHasPerm = context.checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED ||
+			context.checkSelfPermission(android.Manifest.permission.ACCESS_COARSE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED
+		if (!boolHasPerm) return
+
+		val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager ?: return
+		try {
+			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+				val stringProvider = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && locationManager.isProviderEnabled(LocationManager.FUSED_PROVIDER)) {
+					LocationManager.FUSED_PROVIDER
+				} else if (locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) {
+					LocationManager.NETWORK_PROVIDER
+				} else {
+					LocationManager.GPS_PROVIDER
+				}
+				locationManager.getCurrentLocation(
+					stringProvider,
+					null,
+					context.mainExecutor
+				) { location ->
+					if (location != null) {
+						updateLocation(location)
+					}
+				}
+			} else {
+				@Suppress("DEPRECATION")
+				locationManager.requestSingleUpdate(
+					LocationManager.NETWORK_PROVIDER,
+					object : LocationListener {
+						override fun onLocationChanged(location: Location) {
+							updateLocation(location)
+						}
+						override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) {}
+						override fun onProviderEnabled(provider: String) {}
+						override fun onProviderDisabled(provider: String) {}
+					},
+					Looper.getMainLooper()
+				)
+			}
+		} catch (e: Exception) {
+			Log.d(TAG, "Could not request single on-demand location: ${e.message}")
 		}
 	}
 
@@ -326,40 +406,39 @@ object DeviceStateManager {
 		var doubleLat: Double? = null
 		var doubleLng: Double? = null
 		if (boolHasLocationPerm) {
-			initLocationListener(context.applicationContext)
-			val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
-			try {
-				val listProviders = mutableListOf<String>()
-				if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-					listProviders.add(LocationManager.FUSED_PROVIDER)
-				} else {
-					listProviders.add("fused")
-				}
-				listProviders.add(LocationManager.GPS_PROVIDER)
-				listProviders.add(LocationManager.NETWORK_PROVIDER)
-				listProviders.add(LocationManager.PASSIVE_PROVIDER)
-
-				var bestLoc = cachedBestLocation
-				for (stringProvider in listProviders) {
-					try {
-						val loc = locationManager?.getLastKnownLocation(stringProvider)
-						if (loc != null) {
-							if (bestLoc == null || loc.time > bestLoc.time) {
-								bestLoc = loc
-							}
-						}
-					} catch (e: SecurityException) {
-						// Ignored
+			var bestLoc = cachedBestLocation
+			if (bestLoc == null) {
+				val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
+				try {
+					val listProviders = mutableListOf<String>()
+					if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+						listProviders.add(LocationManager.FUSED_PROVIDER)
 					}
+					listProviders.add(LocationManager.PASSIVE_PROVIDER)
+					listProviders.add(LocationManager.NETWORK_PROVIDER)
+					listProviders.add(LocationManager.GPS_PROVIDER)
+
+					for (stringProvider in listProviders) {
+						try {
+							val loc = locationManager?.getLastKnownLocation(stringProvider)
+							if (loc != null) {
+								if (bestLoc == null || loc.time > bestLoc.time) {
+									bestLoc = loc
+								}
+							}
+						} catch (_: SecurityException) {}
+					}
+					if (bestLoc != null) {
+						cachedBestLocation = bestLoc
+						_flowLocation.value = bestLoc
+					}
+				} catch (e: Exception) {
+					Log.d(TAG, "Error fetching cached location: ${e.message}")
 				}
-				if (bestLoc != null) {
-					cachedBestLocation = bestLoc
-					_flowLocation.value = bestLoc
-					doubleLat = bestLoc.latitude
-					doubleLng = bestLoc.longitude
-				}
-			} catch (e: Exception) {
-				Log.d(TAG, "Error fetching last known location: ${e.message}")
+			}
+			if (bestLoc != null) {
+				doubleLat = bestLoc.latitude
+				doubleLng = bestLoc.longitude
 			}
 		}
 

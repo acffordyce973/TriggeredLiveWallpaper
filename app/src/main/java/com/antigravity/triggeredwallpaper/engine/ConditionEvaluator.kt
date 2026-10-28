@@ -123,6 +123,8 @@ object ConditionEvaluator {
 					if (boolInside != objSet.geofenceCondition.boolInside) {
 						return false
 					}
+				} else {
+					return false
 				}
 			}
 		}

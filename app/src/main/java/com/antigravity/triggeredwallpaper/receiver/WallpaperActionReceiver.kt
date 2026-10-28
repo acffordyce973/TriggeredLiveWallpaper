@@ -3,7 +3,6 @@ package com.antigravity.triggeredwallpaper.receiver
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.os.PowerManager
 import com.antigravity.triggeredwallpaper.data.WallpaperRepository
 import com.antigravity.triggeredwallpaper.engine.ConditionEvaluator
 import com.antigravity.triggeredwallpaper.engine.DeviceStateManager
@@ -26,6 +25,15 @@ class WallpaperActionReceiver : BroadcastReceiver() {
 		private val advanceMutex = Mutex()
 		private var dtLastAdvanceMs = 0L
 
+		/**
+		 * Evaluates current device conditions, selects the next wallpaper image,
+		 * and updates settings only when state has actually changed.
+		 *
+		 * :param context: Context instance.
+		 * :type context: Context
+		 * :param boolForceNext: Whether to force advance even if condition set has not changed.
+		 * :type boolForceNext: Boolean
+		 */
 		suspend fun advanceToNextImage(
 			context: Context,
 			boolForceNext: Boolean = true
@@ -84,34 +92,43 @@ class WallpaperActionReceiver : BroadcastReceiver() {
 					objNextLockImage = objNextHomeImage
 				}
 
-				if (objNextHomeImage != null || objNextLockImage != null || boolHomeSetChanged || boolLockSetChanged) {
+				val stringNewHomeSetId = objMatchedHomeSet?.stringId ?: objSettings.stringCurrentHomeSetId
+				val stringNewHomeUri = objNextHomeImage?.stringUri ?: objSettings.stringCurrentHomeImageUri
+				val stringNewHomeName = objNextHomeImage?.stringDisplayName ?: objSettings.stringCurrentHomeImageName
+				val stringNewHomePath = objNextHomeImage?.stringFolderPath ?: objSettings.stringCurrentHomeImagePath
+
+				val stringNewLockSetId = if (objSettings.boolSeparateHomeAndLock) {
+					objMatchedLockSet?.stringId ?: objSettings.stringCurrentLockSetId
+				} else {
+					stringNewHomeSetId
+				}
+				val stringNewLockUri = if (objSettings.boolSeparateHomeAndLock) {
+					objNextLockImage?.stringUri ?: objSettings.stringCurrentLockImageUri
+				} else {
+					stringNewHomeUri
+				}
+				val stringNewLockName = if (objSettings.boolSeparateHomeAndLock) {
+					objNextLockImage?.stringDisplayName ?: objSettings.stringCurrentLockImageName
+				} else {
+					stringNewHomeName
+				}
+				val stringNewLockPath = if (objSettings.boolSeparateHomeAndLock) {
+					objNextLockImage?.stringFolderPath ?: objSettings.stringCurrentLockImagePath
+				} else {
+					stringNewHomePath
+				}
+
+				val boolStateChanged = stringNewHomeSetId != objSettings.stringCurrentHomeSetId ||
+					stringNewHomeUri != objSettings.stringCurrentHomeImageUri ||
+					stringNewHomeName != objSettings.stringCurrentHomeImageName ||
+					stringNewHomePath != objSettings.stringCurrentHomeImagePath ||
+					stringNewLockSetId != objSettings.stringCurrentLockSetId ||
+					stringNewLockUri != objSettings.stringCurrentLockImageUri ||
+					stringNewLockName != objSettings.stringCurrentLockImageName ||
+					stringNewLockPath != objSettings.stringCurrentLockImagePath
+
+				if (boolStateChanged) {
 					repository.updateAppSettings { current ->
-						val stringNewHomeSetId = objMatchedHomeSet?.stringId ?: current.stringCurrentHomeSetId
-						val stringNewHomeUri = objNextHomeImage?.stringUri ?: current.stringCurrentHomeImageUri
-						val stringNewHomeName = objNextHomeImage?.stringDisplayName ?: current.stringCurrentHomeImageName
-						val stringNewHomePath = objNextHomeImage?.stringFolderPath ?: current.stringCurrentHomeImagePath
-
-						val stringNewLockSetId = if (objSettings.boolSeparateHomeAndLock) {
-							objMatchedLockSet?.stringId ?: current.stringCurrentLockSetId
-						} else {
-							stringNewHomeSetId
-						}
-						val stringNewLockUri = if (objSettings.boolSeparateHomeAndLock) {
-							objNextLockImage?.stringUri ?: current.stringCurrentLockImageUri
-						} else {
-							stringNewHomeUri
-						}
-						val stringNewLockName = if (objSettings.boolSeparateHomeAndLock) {
-							objNextLockImage?.stringDisplayName ?: current.stringCurrentLockImageName
-						} else {
-							stringNewHomeName
-						}
-						val stringNewLockPath = if (objSettings.boolSeparateHomeAndLock) {
-							objNextLockImage?.stringFolderPath ?: current.stringCurrentLockImagePath
-						} else {
-							stringNewHomePath
-						}
-
 						current.copy(
 							stringCurrentHomeSetId = stringNewHomeSetId,
 							stringCurrentHomeImageUri = stringNewHomeUri,
@@ -123,13 +140,13 @@ class WallpaperActionReceiver : BroadcastReceiver() {
 							stringCurrentLockImagePath = stringNewLockPath
 						)
 					}
+
+					// 3. Notify running WallpaperService to update display immediately
+					context.sendBroadcast(Intent(TriggeredWallpaperService.ACTION_REFRESH_FRAME))
+
+					// 4. Update persistent notification
+					WallpaperNotificationManager.showOrUpdateNotification(context)
 				}
-
-				// 3. Notify running WallpaperService to update display immediately
-				context.sendBroadcast(Intent(TriggeredWallpaperService.ACTION_REFRESH_FRAME))
-
-				// 4. Update persistent notification
-				WallpaperNotificationManager.showOrUpdateNotification(context)
 
 				// 5. Reset interval alarm
 				WallpaperAlarmScheduler.scheduleNextAlarm(context)
@@ -140,26 +157,13 @@ class WallpaperActionReceiver : BroadcastReceiver() {
 	override fun onReceive(context: Context, intent: Intent) {
 		val stringAction = intent.action ?: return
 		if (stringAction == ACTION_NEXT_IMAGE || stringAction == TriggeredWallpaperService.ACTION_TRIGGER_NEXT) {
-			val powerManager = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
-			val wakeLock = powerManager?.newWakeLock(
-				PowerManager.PARTIAL_WAKE_LOCK,
-				"TriggeredWallpaper:ActionWakeLock"
-			)
-			wakeLock?.acquire(10000L)
-
 			val asyncPendingResult = goAsync()
-
 			CoroutineScope(Dispatchers.IO).launch {
 				try {
 					advanceToNextImage(context, boolForceNext = true)
 				} catch (e: Exception) {
 					e.printStackTrace()
 				} finally {
-					try {
-						wakeLock?.release()
-					} catch (e: Exception) {
-						e.printStackTrace()
-					}
 					asyncPendingResult.finish()
 				}
 			}

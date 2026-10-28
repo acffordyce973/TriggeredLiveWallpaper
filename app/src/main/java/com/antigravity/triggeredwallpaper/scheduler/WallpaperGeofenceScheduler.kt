@@ -7,6 +7,8 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.util.Log
 import androidx.core.content.ContextCompat
+import com.antigravity.triggeredwallpaper.data.WallpaperRepository
+import com.antigravity.triggeredwallpaper.model.FolderSet
 import com.antigravity.triggeredwallpaper.model.GeofenceArea
 import com.antigravity.triggeredwallpaper.receiver.WallpaperGeofenceReceiver
 import com.google.android.gms.location.Geofence
@@ -30,10 +32,52 @@ object WallpaperGeofenceScheduler {
 		return PendingIntent.getBroadcast(context, REQUEST_CODE_GEOFENCE, intentGeofence, intFlags)
 	}
 
-	fun synchronizeGeofences(context: Context, listGeofences: List<GeofenceArea>) {
+	/**
+	 * Synchronizes active geofences with Google Play Services GeofencingClient.
+	 *
+	 * Only registers geofences if location permissions are granted and at least
+	 * one enabled FolderSet uses geofence conditions, preventing unnecessary background tracking.
+	 *
+	 * :param context: Context instance.
+	 * :type context: Context
+	 * :param listGeofences: List of configured geofence areas.
+	 * :type listGeofences: List<GeofenceArea>
+	 * :param listFolderSets: Optional list of folder sets; if null, reads from repository.
+	 * :type listFolderSets: List<FolderSet>?
+	 */
+	fun synchronizeGeofences(
+		context: Context,
+		listGeofences: List<GeofenceArea>,
+		listFolderSets: List<FolderSet>? = null
+	) {
 		val boolHasFine = ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
 		if (!boolHasFine) {
 			Log.d(TAG, "Cannot synchronize geofences: fine location permission not granted")
+			return
+		}
+
+		// Only register geofences if there are active folder sets that actually use geofences
+		val listSetsToCheck = listFolderSets ?: try {
+			WallpaperRepository.getInstance(context).flowFolderSets.value
+		} catch (e: Exception) {
+			emptyList()
+		}
+		val boolAnySetUsesGeofence = listSetsToCheck.any { it.boolIsEnabled && it.geofenceCondition.boolEnabled }
+
+		if (!boolAnySetUsesGeofence || listGeofences.isEmpty()) {
+			removeAllGeofences(context)
+			return
+		}
+
+		// Filter to only geofences actually referenced by active sets
+		val setReferencedIds = listSetsToCheck
+			.filter { it.boolIsEnabled && it.geofenceCondition.boolEnabled }
+			.map { it.geofenceCondition.stringGeofenceId }
+			.toSet()
+
+		val listActiveGeofences = listGeofences.filter { setReferencedIds.contains(it.stringId) }
+		if (listActiveGeofences.isEmpty()) {
+			removeAllGeofences(context)
 			return
 		}
 
@@ -41,14 +85,7 @@ object WallpaperGeofenceScheduler {
 			val geofencingClient = LocationServices.getGeofencingClient(context)
 			val pendingIntent = getGeofencePendingIntent(context)
 
-			if (listGeofences.isEmpty()) {
-				geofencingClient.removeGeofences(pendingIntent).addOnCompleteListener {
-					Log.d(TAG, "Removed all registered geofences")
-				}
-				return
-			}
-
-			val listPlayGeofences = listGeofences.map { objGeo ->
+			val listPlayGeofences = listActiveGeofences.map { objGeo ->
 				Geofence.Builder()
 					.setRequestId(objGeo.stringId)
 					.setCircularRegion(
@@ -70,7 +107,7 @@ object WallpaperGeofenceScheduler {
 				try {
 					geofencingClient.addGeofences(request, pendingIntent)
 						.addOnSuccessListener {
-							Log.i(TAG, "Successfully registered ${listPlayGeofences.size} geofence(s) with LocationServices")
+							Log.i(TAG, "Successfully registered ${listPlayGeofences.size} active geofence(s) with LocationServices")
 						}
 						.addOnFailureListener { e ->
 							Log.w(TAG, "Failed to register geofences with LocationServices: ${e.message}")
@@ -84,11 +121,19 @@ object WallpaperGeofenceScheduler {
 		}
 	}
 
+	/**
+	 * Removes all registered geofences from Google Play Services.
+	 *
+	 * :param context: Context instance.
+	 * :type context: Context
+	 */
 	fun removeAllGeofences(context: Context) {
 		try {
 			val geofencingClient = LocationServices.getGeofencingClient(context)
 			val pendingIntent = getGeofencePendingIntent(context)
-			geofencingClient.removeGeofences(pendingIntent)
+			geofencingClient.removeGeofences(pendingIntent).addOnCompleteListener {
+				Log.d(TAG, "Removed all registered geofences")
+			}
 		} catch (e: Throwable) {
 			Log.d(TAG, "Could not remove geofences: ${e.message}")
 		}

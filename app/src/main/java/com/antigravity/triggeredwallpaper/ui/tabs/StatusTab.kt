@@ -144,6 +144,7 @@ fun StatusTab(
 				objDeviceState = DeviceStateManager.getDeviceState(context).copy(
 					orientationCondition = orientation
 				)
+				DeviceStateManager.requestSingleLocation(context)
 			}
 		}
 		lifecycleOwner.lifecycle.addObserver(observer)

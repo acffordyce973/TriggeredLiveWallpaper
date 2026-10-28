@@ -112,6 +112,7 @@ class TriggeredWallpaperService : WallpaperService() {
 		private var intSurfaceWidth = 0
 		private var intSurfaceHeight = 0
 		private var boolIsVisible = false
+		private var boolPendingBitmapReload = false
 
 		private var stringLoadedHomeUri: String? = null
 		private var stringLoadedLockUri: String? = null
@@ -145,13 +146,22 @@ class TriggeredWallpaperService : WallpaperService() {
 						}
 					}
 					Intent.ACTION_USER_PRESENT -> {
-						drawFrame()
+						if (boolIsVisible) {
+							drawFrame()
+						}
 						// Tablet edge case: lockscreen was landscape, homescreen is portrait.
 						// Give the window manager / launcher 1.2s to settle into portrait, then double-check conditions
 						scheduleDelayedConditionCheck(1200L)
 					}
 					Intent.ACTION_SCREEN_ON -> {
-						drawFrame()
+						if (boolPendingBitmapReload) {
+							boolPendingBitmapReload = false
+							engineScope.launch {
+								syncBitmapsAndDraw(objRepository.flowSettings.value, boolForceReload = true)
+							}
+						} else if (boolIsVisible) {
+							drawFrame()
+						}
 						val objCurrentState = DeviceStateManager.getDeviceState(applicationContext)
 						val listSets = objRepository.flowFolderSets.value
 						val listGeos = objRepository.flowGeofences.value
@@ -172,7 +182,7 @@ class TriggeredWallpaperService : WallpaperService() {
 						}
 					}
 					Intent.ACTION_SCREEN_OFF -> {
-						drawFrame()
+						// Do nothing on screen off to save CPU and battery
 					}
 				}
 			}
@@ -197,7 +207,11 @@ class TriggeredWallpaperService : WallpaperService() {
 
 			// Schedule alarms, geofences, and notification once
 			WallpaperAlarmScheduler.scheduleNextAlarm(applicationContext)
-			WallpaperGeofenceScheduler.synchronizeGeofences(applicationContext, objRepository.flowGeofences.value)
+			WallpaperGeofenceScheduler.synchronizeGeofences(
+				applicationContext,
+				objRepository.flowGeofences.value,
+				objRepository.flowFolderSets.value
+			)
 
 			// Observe settings for live wallpaper updates
 			engineScope.launch {
@@ -213,12 +227,16 @@ class TriggeredWallpaperService : WallpaperService() {
 				}
 			}
 
-			// Observe location changes for immediate geofence adaptation
+			// Observe passive location updates for geofence adaptation if geofences are configured
 			engineScope.launch {
 				var lastEvaluatedLat: Double? = null
 				var lastEvaluatedLng: Double? = null
 				DeviceStateManager.flowLocation.collectLatest { objLocation ->
 					if (objLocation != null) {
+						val listSets = objRepository.flowFolderSets.value
+						val boolHasGeofenceSet = listSets.any { it.boolIsEnabled && it.geofenceCondition.boolEnabled }
+						if (!boolHasGeofenceSet) return@collectLatest
+
 						val doubleLat = objLocation.latitude
 						val doubleLng = objLocation.longitude
 						val boolSignificantMove = if (lastEvaluatedLat != null && lastEvaluatedLng != null) {
@@ -230,7 +248,7 @@ class TriggeredWallpaperService : WallpaperService() {
 								doubleLng,
 								arrayDistances
 							)
-							arrayDistances[0] >= 20f
+							arrayDistances[0] >= 50f
 						} else {
 							true
 						}
@@ -270,7 +288,14 @@ class TriggeredWallpaperService : WallpaperService() {
 		override fun onVisibilityChanged(visible: Boolean) {
 			boolIsVisible = visible
 			if (visible) {
-				drawFrame()
+				if (boolPendingBitmapReload) {
+					boolPendingBitmapReload = false
+					engineScope.launch {
+						syncBitmapsAndDraw(objRepository.flowSettings.value, boolForceReload = true)
+					}
+				} else {
+					drawFrame()
+				}
 			}
 		}
 
@@ -376,6 +401,11 @@ class TriggeredWallpaperService : WallpaperService() {
 			objSettings: AppSettings,
 			boolForceReload: Boolean = false
 		) {
+			if (!boolIsVisible) {
+				boolPendingBitmapReload = true
+				return
+			}
+
 			val stringHomeUri = objSettings.stringCurrentHomeImageUri
 			val stringLockUri = objSettings.stringCurrentLockImageUri
 
@@ -426,6 +456,7 @@ class TriggeredWallpaperService : WallpaperService() {
 		}
 
 		private fun drawFrame() {
+			if (!boolIsVisible) return
 			val holder = surfaceHolder ?: return
 			if (intSurfaceWidth <= 0 || intSurfaceHeight <= 0) return
 

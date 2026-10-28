@@ -34,6 +34,11 @@ object WallpaperNotificationManager {
 	private const val REQUEST_CODE_OPEN = 101
 	private const val REQUEST_CODE_NEXT = 102
 
+	@Volatile
+	private var stringLastThumbnailUri: String? = null
+	@Volatile
+	private var bitmapCachedThumbnail: Bitmap? = null
+
 	fun createNotificationChannel(context: Context) {
 		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
 			val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
@@ -135,16 +140,29 @@ object WallpaperNotificationManager {
 			)
 
 		val notificationManager = appContext.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
-		notificationManager?.notify(NOTIFICATION_ID, builderNotification.build())
 
-		// Decode thumbnail asynchronously for the large icon
-		if (!stringImageUri.isNullOrBlank()) {
-			CoroutineScope(Dispatchers.IO).launch {
-				val bitmapThumbnail = decodeThumbnail(appContext, stringImageUri)
-				if (bitmapThumbnail != null) {
-					builderNotification.setLargeIcon(bitmapThumbnail)
-					withContext(Dispatchers.Main) {
-						notificationManager?.notify(NOTIFICATION_ID, builderNotification.build())
+		// Reuse cached thumbnail if URI hasn't changed to avoid re-decoding from flash storage
+		val cachedBmp = bitmapCachedThumbnail
+		if (!stringImageUri.isNullOrBlank() && stringImageUri == stringLastThumbnailUri && cachedBmp != null && !cachedBmp.isRecycled) {
+			builderNotification.setLargeIcon(cachedBmp)
+			notificationManager?.notify(NOTIFICATION_ID, builderNotification.build())
+		} else {
+			notificationManager?.notify(NOTIFICATION_ID, builderNotification.build())
+
+			if (!stringImageUri.isNullOrBlank()) {
+				CoroutineScope(Dispatchers.IO).launch {
+					val bitmapThumbnail = decodeThumbnail(appContext, stringImageUri)
+					if (bitmapThumbnail != null) {
+						val oldBmp = bitmapCachedThumbnail
+						if (oldBmp != null && oldBmp != bitmapThumbnail && !oldBmp.isRecycled) {
+							oldBmp.recycle()
+						}
+						bitmapCachedThumbnail = bitmapThumbnail
+						stringLastThumbnailUri = stringImageUri
+						builderNotification.setLargeIcon(bitmapThumbnail)
+						withContext(Dispatchers.Main) {
+							notificationManager?.notify(NOTIFICATION_ID, builderNotification.build())
+						}
 					}
 				}
 			}
@@ -154,6 +172,9 @@ object WallpaperNotificationManager {
 	fun cancelNotification(context: Context) {
 		val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
 		notificationManager?.cancel(NOTIFICATION_ID)
+		bitmapCachedThumbnail?.recycle()
+		bitmapCachedThumbnail = null
+		stringLastThumbnailUri = null
 	}
 
 	private fun openImageStream(context: Context, uriImage: Uri): InputStream? {

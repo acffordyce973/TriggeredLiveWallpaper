@@ -3,7 +3,6 @@ package com.antigravity.triggeredwallpaper.receiver
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.os.PowerManager
 import android.util.Log
 import com.antigravity.triggeredwallpaper.engine.DeviceStateManager
 import com.google.android.gms.location.Geofence
@@ -43,13 +42,6 @@ class WallpaperGeofenceReceiver : BroadcastReceiver() {
 				DeviceStateManager.updateLocation(loc)
 			}
 
-			val powerManager = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
-			val wakeLock = powerManager?.newWakeLock(
-				PowerManager.PARTIAL_WAKE_LOCK,
-				"TriggeredWallpaper:GeofenceWakeLock"
-			)
-			wakeLock?.acquire(10000L)
-
 			val asyncPendingResult = goAsync()
 			CoroutineScope(Dispatchers.IO).launch {
 				try {
@@ -57,9 +49,6 @@ class WallpaperGeofenceReceiver : BroadcastReceiver() {
 				} catch (e: Exception) {
 					Log.e(TAG, "Failed advancing image on geofence transition: ${e.message}", e)
 				} finally {
-					try {
-						wakeLock?.release()
-					} catch (_: Exception) {}
 					asyncPendingResult.finish()
 				}
 			}
