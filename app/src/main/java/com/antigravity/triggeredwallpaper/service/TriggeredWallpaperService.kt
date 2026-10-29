@@ -154,14 +154,7 @@ class TriggeredWallpaperService : WallpaperService() {
 						scheduleDelayedConditionCheck(1200L)
 					}
 					Intent.ACTION_SCREEN_ON -> {
-						if (boolPendingBitmapReload) {
-							boolPendingBitmapReload = false
-							engineScope.launch {
-								syncBitmapsAndDraw(objRepository.flowSettings.value, boolForceReload = true)
-							}
-						} else if (boolIsVisible) {
-							drawFrame()
-						}
+						val objSettings = objRepository.flowSettings.value
 						val objCurrentState = DeviceStateManager.getDeviceState(applicationContext)
 						val listSets = objRepository.flowFolderSets.value
 						val listGeos = objRepository.flowGeofences.value
@@ -170,13 +163,29 @@ class TriggeredWallpaperService : WallpaperService() {
 							WallpaperTarget.HOME,
 							listSets,
 							listGeos,
-							objRepository.flowSettings.value
+							objSettings
 						)
+
+						val longNow = System.currentTimeMillis()
+						val intInterval = objHomeSet?.intIntervalMinutes ?: 0
+						val boolIntervalExpired = intInterval > 0 &&
+							objSettings.longLastHomeImageChangeMs > 0L &&
+							(longNow - objSettings.longLastHomeImageChangeMs >= intInterval * 60 * 1000L)
+
 						val boolChangeOnScreenOn = objHomeSet?.boolChangeOnScreenOn ?: false
-						if (boolChangeOnScreenOn) {
+
+						if (boolIntervalExpired || boolChangeOnScreenOn) {
 							engineScope.launch(Dispatchers.IO) {
 								WallpaperActionReceiver.advanceToNextImage(applicationContext, boolForceNext = true)
 							}
+						} else if (boolPendingBitmapReload) {
+							boolPendingBitmapReload = false
+							engineScope.launch {
+								syncBitmapsAndDraw(objRepository.flowSettings.value, boolForceReload = true)
+							}
+						} else if (boolIsVisible) {
+							drawFrame()
+							scheduleDelayedConditionCheck(400L)
 						} else {
 							scheduleDelayedConditionCheck(400L)
 						}
@@ -288,7 +297,28 @@ class TriggeredWallpaperService : WallpaperService() {
 		override fun onVisibilityChanged(visible: Boolean) {
 			boolIsVisible = visible
 			if (visible) {
-				if (boolPendingBitmapReload) {
+				val objSettings = objRepository.flowSettings.value
+				val objCurrentState = DeviceStateManager.getDeviceState(applicationContext)
+				val listSets = objRepository.flowFolderSets.value
+				val listGeos = objRepository.flowGeofences.value
+				val objHomeSet = ConditionEvaluator.evaluateMatchingSet(
+					objCurrentState,
+					WallpaperTarget.HOME,
+					listSets,
+					listGeos,
+					objSettings
+				)
+				val longNow = System.currentTimeMillis()
+				val intInterval = objHomeSet?.intIntervalMinutes ?: 0
+				val boolIntervalExpired = intInterval > 0 &&
+					objSettings.longLastHomeImageChangeMs > 0L &&
+					(longNow - objSettings.longLastHomeImageChangeMs >= intInterval * 60 * 1000L)
+
+				if (boolIntervalExpired) {
+					engineScope.launch(Dispatchers.IO) {
+						WallpaperActionReceiver.advanceToNextImage(applicationContext, boolForceNext = true)
+					}
+				} else if (boolPendingBitmapReload) {
 					boolPendingBitmapReload = false
 					engineScope.launch {
 						syncBitmapsAndDraw(objRepository.flowSettings.value, boolForceReload = true)

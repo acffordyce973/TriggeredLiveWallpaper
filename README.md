@@ -60,7 +60,7 @@ Each Wallpaper Set can specify one or more conditions. The engine continuously e
 
 Triggers determine *when* the wallpaper engine checks conditions and advances the wallpaper image:
 
-- **Timed Interval:** Transitions wallpaper every *N* minutes using sleep-aware background scheduling that respects Android Doze mode.
+- **Timed Interval:** Automatically transitions wallpaper every *N* minutes (from fast 1m/2m testing intervals up to 24h+), featuring direct minute text input, stepper buttons, smooth slider, preset chips, and automatic catch-up on screen wake.
 - **Screen On / Unlock:** Switches wallpaper immediately when you turn on the screen or wake the device.
 - **Double-Tap:** Double-tap anywhere on an empty area of your home screen to shuffle to the next image.
 - **Device Rotation:** Triggers an immediate re-evaluation and wallpaper change when rotating between portrait and landscape.
@@ -80,8 +80,8 @@ Triggers determine *when* the wallpaper engine checks conditions and advances th
 ### 🔋 Battery Optimization & Background Efficiency
 Triggered Live Wallpaper is engineered from the ground up for minimal battery impact:
 - **Zero-Drain Location Awareness:** Completely eliminates active GPS hardware polling in the background. Location caching relies exclusively on cached fixes and passive updates (which only receive fixes when other apps like Google Maps query location), while geofences are monitored via low-power hardware co-processors via Google Play Services Geofencing.
-- **Deep Sleep (Doze) Preservation:** Interval alarms utilize non-wakeup alarms (`ELAPSED_REALTIME`), preventing unnecessary CPU interrupts and wake locks while the phone is idle or sitting on a nightstand overnight.
-- **Deferred Screen-Off Rendering:** Bitmap decoding from flash storage and canvas rendering are suspended while the screen is off or the wallpaper surface is hidden, eliminating redundant background CPU/GPU load until the screen becomes visible.
+- **Smart Sleep-Aware Scheduling:** Exact intervals use hardware alarms only when configured (>0m), automatically canceling when intervals are disabled (0m).
+- **Deferred Screen-Off Rendering & Screen Wake Catch-Up:** Bitmap decoding and canvas rendering are suspended while the screen is off or the wallpaper surface is hidden, eliminating redundant background CPU/GPU load. If an interval elapses while the device was asleep or the screen was off, the wallpaper catches up and switches immediately upon turning on the display.
 - **Native Async Coroutines Without Wake Locks:** Employs Android's `goAsync()` receiver architecture for background coroutine processing, avoiding manual `PARTIAL_WAKE_LOCK` allocations that trigger Android OS battery warnings.
 - **State-Guarded Storage Writes:** Persistent JSON configuration files are only rewritten to disk when active image URIs or folder set configurations actually change.
 

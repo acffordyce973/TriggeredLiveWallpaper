@@ -47,12 +47,6 @@ class WallpaperAlarmReceiver : BroadcastReceiver() {
 			}
 		}
 
-		// Only proceed if Triggered Live Wallpaper is currently the active wallpaper
-		if (!WallpaperAlarmScheduler.isLiveWallpaperActive(context)) {
-			WallpaperAlarmScheduler.cancelAlarm(context)
-			return
-		}
-
 		val asyncPendingResult = goAsync()
 		CoroutineScope(Dispatchers.IO).launch {
 			try {

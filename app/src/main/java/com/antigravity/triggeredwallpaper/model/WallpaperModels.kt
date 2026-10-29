@@ -125,7 +125,9 @@ data class AppSettings(
 	val stringCurrentLockImageName: String? = null,
 	val stringCurrentHomeImagePath: String? = null,
 	val stringCurrentLockImagePath: String? = null,
-	val stringBackupFilenameTemplate: String = "TriggeredWallpaper_Config_{yyyyMMdd_HHmmss}"
+	val stringBackupFilenameTemplate: String = "TriggeredWallpaper_Config_{yyyyMMdd_HHmmss}",
+	val longLastHomeImageChangeMs: Long = 0L,
+	val longLastLockImageChangeMs: Long = 0L
 )
 
 fun formatBackupFilename(stringTemplate: String): String {

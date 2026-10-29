@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -17,7 +18,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
@@ -103,8 +106,11 @@ fun FolderSetEditDialog(
 	var listUris by remember { mutableStateOf(objInitialSet?.listFolderUris ?: emptyList()) }
 
 	// Triggers
-	var floatIntervalMinutes by remember {
-		mutableFloatStateOf(objInitialSet?.intIntervalMinutes?.toFloat() ?: 0f)
+	var intIntervalMinutes by remember {
+		mutableIntStateOf(objInitialSet?.intIntervalMinutes ?: 0)
+	}
+	var stringIntervalText by remember {
+		mutableStateOf((objInitialSet?.intIntervalMinutes ?: 0).toString())
 	}
 	var boolQuickTile by remember { mutableStateOf(objInitialSet?.boolQuickTileEnabled ?: false) }
 	var boolDoubleTap by remember { mutableStateOf(objInitialSet?.boolChangeOnDoubleTap ?: true) }
@@ -372,28 +378,139 @@ fun FolderSetEditDialog(
 				// 3. Triggers section
 				Text("Triggers", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
 
-				// Interval slider
-				Column {
-					val intInterval = floatIntervalMinutes.toInt()
-					val stringIntervalLabel = when (intInterval) {
+				// Interval configuration
+				Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+					val stringIntervalLabel = when (intIntervalMinutes) {
 						0 -> "Disabled (Manual or trigger only)"
-						15 -> "Every 15 minutes"
-						30 -> "Every 30 minutes"
-						60 -> "Every 1 hour"
-						120 -> "Every 2 hours"
-						360 -> "Every 6 hours"
-						720 -> "Every 12 hours"
-						1440 -> "Every 24 hours"
-						else -> "Every $intInterval minutes"
+						1 -> "Every 1 minute (Fast test)"
+						2 -> "Every 2 minutes (Testing)"
+						in 3..59 -> "Every $intIntervalMinutes minutes"
+						else -> {
+							val intHours = intIntervalMinutes / 60
+							val intRemainingMins = intIntervalMinutes % 60
+							if (intRemainingMins == 0) {
+								"Every $intHours ${if (intHours == 1) "hour" else "hours"}"
+							} else {
+								"Every ${intHours}h ${intRemainingMins}m"
+							}
+						}
 					}
-					Text("Auto-change Interval: $stringIntervalLabel", style = MaterialTheme.typography.bodyMedium)
+
+					Text(
+						"Auto-change Interval: $stringIntervalLabel",
+						style = MaterialTheme.typography.bodyMedium,
+						fontWeight = FontWeight.SemiBold
+					)
+
+					// Row with Stepper buttons and Direct text input
+					Row(
+						modifier = Modifier.fillMaxWidth(),
+						verticalAlignment = Alignment.CenterVertically,
+						horizontalArrangement = Arrangement.spacedBy(6.dp)
+					) {
+						OutlinedButton(
+							onClick = {
+								val intNew = (intIntervalMinutes - 5).coerceAtLeast(0)
+								intIntervalMinutes = intNew
+								stringIntervalText = intNew.toString()
+							},
+							contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+						) {
+							Text("-5m")
+						}
+						OutlinedButton(
+							onClick = {
+								val intNew = (intIntervalMinutes - 1).coerceAtLeast(0)
+								intIntervalMinutes = intNew
+								stringIntervalText = intNew.toString()
+							},
+							contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+						) {
+							Text("-1m")
+						}
+						OutlinedTextField(
+							value = stringIntervalText,
+							onValueChange = { stringNew ->
+								val stringDigits = stringNew.filter { it.isDigit() }
+								stringIntervalText = stringDigits
+								val intParsed = stringDigits.toIntOrNull() ?: 0
+								intIntervalMinutes = intParsed.coerceIn(0, 10080)
+							},
+							label = { Text("Minutes") },
+							singleLine = true,
+							keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+							modifier = Modifier.weight(1f)
+						)
+						OutlinedButton(
+							onClick = {
+								val intNew = (intIntervalMinutes + 1).coerceAtMost(10080)
+								intIntervalMinutes = intNew
+								stringIntervalText = intNew.toString()
+							},
+							contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+						) {
+							Text("+1m")
+						}
+						OutlinedButton(
+							onClick = {
+								val intNew = (intIntervalMinutes + 5).coerceAtMost(10080)
+								intIntervalMinutes = intNew
+								stringIntervalText = intNew.toString()
+							},
+							contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+						) {
+							Text("+5m")
+						}
+					}
+
+					// Smooth slider for quick dragging up to 180 minutes (3 hours)
 					Slider(
-						value = floatIntervalMinutes,
-						onValueChange = { floatIntervalMinutes = it },
-						valueRange = 0f..720f,
-						steps = 11,
+						value = intIntervalMinutes.toFloat().coerceIn(0f, 180f),
+						onValueChange = { floatVal ->
+							val intNew = floatVal.toInt()
+							intIntervalMinutes = intNew
+							stringIntervalText = intNew.toString()
+						},
+						valueRange = 0f..180f,
 						modifier = Modifier.fillMaxWidth()
 					)
+
+					// Quick preset chips
+					Text(
+						"Quick Presets:",
+						style = MaterialTheme.typography.labelSmall,
+						color = MaterialTheme.colorScheme.onSurfaceVariant
+					)
+					FlowRow(
+						horizontalArrangement = Arrangement.spacedBy(6.dp),
+						verticalArrangement = Arrangement.spacedBy(6.dp),
+						modifier = Modifier.fillMaxWidth()
+					) {
+						val listPresets = listOf(
+							0 to "Off",
+							1 to "1m (Test)",
+							2 to "2m (Test)",
+							5 to "5m",
+							15 to "15m",
+							30 to "30m",
+							35 to "35m",
+							60 to "1h",
+							120 to "2h",
+							240 to "4h",
+							720 to "12h",
+							1440 to "24h"
+						)
+						for ((intPresetMins, stringPresetLabel) in listPresets) {
+							FilterChip(
+								selected = intIntervalMinutes == intPresetMins,
+								onClick = {
+									intIntervalMinutes = intPresetMins
+									stringIntervalText = intPresetMins.toString()
+								},
+								label = { Text(stringPresetLabel) }
+							)
+						}
+					}
 				}
 
 				// Trigger switches
@@ -813,7 +930,7 @@ fun FolderSetEditDialog(
 						boolIsEnabled = boolIsEnabled,
 						listFolderUris = listUris,
 						boolQuickTileEnabled = boolQuickTile,
-						intIntervalMinutes = floatIntervalMinutes.toInt(),
+						intIntervalMinutes = intIntervalMinutes,
 						boolChangeOnRotate = boolChangeOnRotate,
 						boolChangeOnFold = boolChangeOnFold,
 						boolChangeOnCharging = boolChangeOnCharging,

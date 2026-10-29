@@ -118,6 +118,12 @@ class WallpaperActionReceiver : BroadcastReceiver() {
 					stringNewHomePath
 				}
 
+				val longNowTime = System.currentTimeMillis()
+				val boolHomeAdvanceHappened = objNextHomeImage != null || boolForceNext
+				val boolLockAdvanceHappened = objNextLockImage != null || boolForceNext
+				val longNewHomeTimestamp = if (boolHomeAdvanceHappened) longNowTime else objSettings.longLastHomeImageChangeMs
+				val longNewLockTimestamp = if (boolLockAdvanceHappened) longNowTime else objSettings.longLastLockImageChangeMs
+
 				val boolStateChanged = stringNewHomeSetId != objSettings.stringCurrentHomeSetId ||
 					stringNewHomeUri != objSettings.stringCurrentHomeImageUri ||
 					stringNewHomeName != objSettings.stringCurrentHomeImageName ||
@@ -125,7 +131,8 @@ class WallpaperActionReceiver : BroadcastReceiver() {
 					stringNewLockSetId != objSettings.stringCurrentLockSetId ||
 					stringNewLockUri != objSettings.stringCurrentLockImageUri ||
 					stringNewLockName != objSettings.stringCurrentLockImageName ||
-					stringNewLockPath != objSettings.stringCurrentLockImagePath
+					stringNewLockPath != objSettings.stringCurrentLockImagePath ||
+					longNewHomeTimestamp != objSettings.longLastHomeImageChangeMs
 
 				if (boolStateChanged) {
 					repository.updateAppSettings { current ->
@@ -137,7 +144,9 @@ class WallpaperActionReceiver : BroadcastReceiver() {
 							stringCurrentLockSetId = stringNewLockSetId,
 							stringCurrentLockImageUri = stringNewLockUri,
 							stringCurrentLockImageName = stringNewLockName,
-							stringCurrentLockImagePath = stringNewLockPath
+							stringCurrentLockImagePath = stringNewLockPath,
+							longLastHomeImageChangeMs = longNewHomeTimestamp,
+							longLastLockImageChangeMs = longNewLockTimestamp
 						)
 					}
 
